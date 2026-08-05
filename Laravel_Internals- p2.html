@@ -1,0 +1,1876 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Laravel Internals – مستندات داخلی لاراول</title>
+    <link rel="stylesheet" href="style/styles.css" />
+    <link rel="stylesheet" href="style/font-style.css" />
+  </head>
+  <body>
+    <h1>📘 Laravel Internals</h1>
+    <p style="text-align: center; color: var(--muted)">
+      مستندات جامع داخلی لاراول برای مصاحبه‌های فنی
+    </p>
+
+    <div class="toc">
+      <strong>فهرست مطالب</strong>
+      <ul>
+        <li><a href="#sec1">۱. Request Lifecycle</a></li>
+        <li><a href="#sec2">۲. Service Container</a></li>
+        <li><a href="#sec3">۳. Dependency Injection</a></li>
+        <li><a href="#sec4">۴. Service Providers</a></li>
+        <li><a href="#sec5">۵. Facades</a></li>
+        <li><a href="#sec6">۶. Middleware</a></li>
+        <li><a href="#sec7">۷. Validation</a></li>
+        <li><a href="#sec8">۸. Security &amp; Sanctum</a></li>
+        <li><a href="#sec9">۹. Gates, Policies, Authorization</a></li>
+        <li><a href="#sec10">۱۰. Repository, Service, Factory Patterns</a></li>
+      </ul>
+    </div>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- ۱. Request Lifecycle -->
+    <!-- ============================================================ -->
+    <h1 id="sec1">Laravel internals – بخش اول: Request lifecycle</h1>
+    <p>وقتی یک درخواست HTTP به Laravel می‌رسد، چه اتفاقی می‌افتد؟</p>
+
+    <div class="flow">
+      Browser / Client<br />
+      <span class="arrow">↓</span><br />
+      Nginx / Apache<br />
+      <span class="arrow">↓</span><br />
+      public/index.php<br />
+      <span class="arrow">↓</span><br />
+      vendor/autoload.php<br />
+      <span class="arrow">↓</span><br />
+      bootstrap/app.php<br />
+      <span class="arrow">↓</span><br />
+      Application instance<br />
+      <span class="arrow">↓</span><br />
+      Service providers<br />
+      <span class="arrow">↓</span><br />
+      HTTP Kernel<br />
+      <span class="arrow">↓</span><br />
+      Middleware<br />
+      <span class="arrow">↓</span><br />
+      Router<br />
+      <span class="arrow">↓</span><br />
+      Controller<br />
+      <span class="arrow">↓</span><br />
+      Response
+    </div>
+
+    <h2>مرحله ۱: ورود درخواست به public/index.php</h2>
+    <p>اولین فایل Laravel: <code>public/index.php</code></p>
+    <p>تقریباً همه درخواست‌ها وارد این فایل می‌شوند.</p>
+    <p>اولین کار:</p>
+    <pre><code>require __DIR__.'/../vendor/autoload.php';</code></pre>
+    <p>این همان Composer Autoload است که قبلاً خواندیم.</p>
+    <p>بعد:</p>
+    <pre><code>$app = require_once __DIR__.'/../bootstrap/app.php';</code></pre>
+    <p>اینجا Application ساخته می‌شود.</p>
+
+    <h2>مرحله ۲: ساخت Application</h2>
+    <p>فایل: <code>bootstrap/app.php</code></p>
+    <p>
+      یک نمونه از کلاس: <code>Illuminate\Foundation\Application</code> می‌سازد.
+    </p>
+    <p>این شیء همان Service Container هم هست.</p>
+    <p>یعنی Application فقط Application نیست؛ Container هم هست.</p>
+    <p>این نکته‌ی مصاحبه‌ای مهم است.</p>
+
+    <h2>مرحله ۳: Service providers</h2>
+    <p>
+      بعد از ساخت Application، Laravel شروع به ثبت Service Providerها می‌کند.
+    </p>
+    <p>مثلاً:</p>
+    <ul>
+      <li>RouteServiceProvider</li>
+      <li>AuthServiceProvider</li>
+      <li>EventServiceProvider</li>
+      <li>AppServiceProvider</li>
+    </ul>
+    <p>هر Provider دو متد مهم دارد:</p>
+    <ul>
+      <li><code>register()</code></li>
+      <li><code>boot()</code></li>
+    </ul>
+    <p>اینجا اتفاق بسیار مهمی می‌افتد.</p>
+    <pre><code>$app->make()</code></pre>
+    <p>یعنی: از Service Container این کلاس را Resolve کن.</p>
+    <p>پس حتی Kernel هم از طریق Container ساخته می‌شود.</p>
+
+    <h2>مرحله ۵: ارسال Request به Kernel</h2>
+    <pre><code>$response = $kernel->handle(
+    $request
+);</code></pre>
+    <p>از اینجا درخواست وارد چرخه‌ی Laravel می‌شود.</p>
+
+    <h2>مرحله ۶: Middleware</h2>
+    <p>Kernel درخواست را از میان Middlewareها عبور می‌دهد.</p>
+    <p>مثل:</p>
+    <ul>
+      <li>Authenticate</li>
+      <li>Throttle</li>
+      <li>VerifyCsrfToken</li>
+      <li>SubstituteBindings</li>
+    </ul>
+    <p>به این ساختار می‌گویند: <strong>Pipeline</strong></p>
+    <div class="flow">
+      Request<br />
+      <span class="arrow">↓</span><br />
+      Middleware 1<br />
+      <span class="arrow">↓</span><br />
+      Middleware 2<br />
+      <span class="arrow">↓</span><br />
+      Middleware 3<br />
+      <span class="arrow">↓</span><br />
+      Controller<br />
+      <span class="arrow">↓</span><br />
+      Response
+    </div>
+    <p>Middleware می‌تواند:</p>
+    <ul>
+      <li>درخواست را تغییر دهد.</li>
+      <li>درخواست را متوقف کند.</li>
+      <li>پاسخ را تغییر دهد.</li>
+    </ul>
+
+    <h3>مثال:</h3>
+    <pre><code>public function handle(
+    $request,
+    Closure $next
+) {
+    if (!$request->user()) {
+        abort(401);
+    }
+
+    return $next($request);
+}</code></pre>
+    <p>اگر کاربر لاگین نباشد، Controller اصلاً اجرا نمی‌شود.</p>
+
+    <h2>مرحله ۷: Router</h2>
+    <p>بعد از Middleware، Router اجرا می‌شود.</p>
+    <p>مثلاً:</p>
+    <pre><code>Route::get('/orders', [OrderController::class, 'index']);</code></pre>
+    <p>Router تشخیص می‌دهد:</p>
+    <ul>
+      <li>URI</li>
+      <li>Method</li>
+      <li>Parameters</li>
+      <li>Controller</li>
+    </ul>
+
+    <h2>مرحله ۸: Controller</h2>
+    <p>Laravel Controller را از طریق Service Container می‌سازد.</p>
+    <pre><code>class OrderController
+{
+    public function __construct(
+        PaymentService $payment
+    ) {
+    }
+}</code></pre>
+    <p>Container خودش PaymentService را Inject می‌کند.</p>
+    <p>این دقیقاً Dependency Injection است.</p>
+
+    <h2>مرحله ۹: Response</h2>
+    <p>Controller ممکن است برگرداند:</p>
+    <pre><code>return response()->json([
+    'success' => true
+]);</code></pre>
+    <p>یا:</p>
+    <pre><code>return view('orders.index');</code></pre>
+    <p>
+      Laravel آن را به یک: <code>Illuminate\Http\Response</code> تبدیل می‌کند.
+    </p>
+
+    <h2>مرحله ۱۰: ارسال Response</h2>
+    <p>در index.php:</p>
+    <pre><code>$response->send();</code></pre>
+    <p>پاسخ به مرورگر ارسال می‌شود.</p>
+    <p>بعد:</p>
+    <pre><code>$kernel->terminate(
+    $request,
+    $response
+);</code></pre>
+    <p>متد <code>terminate()</code> اجرا می‌شود.</p>
+    <p>اینجا کارهایی مثل:</p>
+    <ul>
+      <li>Session</li>
+      <li>Logging</li>
+      <li>Queue dispatch</li>
+      <li>Terminable Middleware</li>
+    </ul>
+    <p>انجام می‌شود.</p>
+
+    <h2>سؤال مهم مصاحبه</h2>
+    <p><strong>اولین فایل Laravel که اجرا می‌شود چیست؟</strong></p>
+    <div class="interview-answer">public/index.php</div>
+    <p><strong>چه چیزی Application را می‌سازد؟</strong></p>
+    <div class="interview-answer">bootstrap/app.php</div>
+    <p><strong>چه چیزی Controller را می‌سازد؟</strong></p>
+    <div class="interview-answer">Service Container</div>
+    <p><strong>Middleware قبل از Router اجرا می‌شود یا بعد؟</strong></p>
+    <div class="interview-answer">
+      Middleware قبل از رسیدن به Controller اجرا می‌شود (در مسیر Kernel و Router
+      Pipeline).
+    </div>
+
+    <h2>پاسخ حرفه‌ای مصاحبه</h2>
+    <p>این پاسخ را حفظ نکن، مفهومش را یاد بگیر:</p>
+    <blockquote>
+      «درخواست از public/index.php وارد Laravel می‌شود، Composer Autoload
+      بارگذاری می‌شود، سپس bootstrap/app.php نمونه‌ی Application و Service
+      Container را ایجاد می‌کند. بعد Service Providerها ثبت و Boot می‌شوند. HTTP
+      Kernel درخواست را دریافت می‌کند و آن را از Pipeline Middlewareها عبور
+      می‌دهد. سپس Router مسیر مناسب را پیدا می‌کند، Controller از طریق Service
+      Container ساخته می‌شود، متد Controller اجرا می‌شود و Response تولید و به
+      مرورگر ارسال می‌شود. در پایان متد terminate() برای کارهای پس از ارسال پاسخ
+      اجرا می‌شود.»
+    </blockquote>
+    <p>این پاسخ در مصاحبه واقعاً امتیاز بالایی دارد.</p>
+    <blockquote>
+      مرحله بعدی که به نظر من مهم‌ترین بخش Laravel Internals است، Service
+      Container و تفاوت bind()، singleton() و make() است؛ آن بخش معمولاً حداقل
+      ۳۰٪ سؤالات Laravel Internals را تشکیل می‌دهد.
+    </blockquote>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- ۲. Service Container -->
+    <!-- ============================================================ -->
+    <h1 id="sec2">بخش دوم – Service Container</h1>
+
+    <p>Service Container چیست؟</p>
+    <p>
+      Service Container یک IoC Container (Inversion of Control Container) است که
+      مسئول ساخت (resolve) و مدیریت وابستگی‌های کلاس‌ها است.
+    </p>
+    <p>
+      <strong>تعریف مصاحبه‌ای:</strong> Service Container یک کلاس مرکزی در
+      Laravel است که وظیفه‌ی Dependency Resolution و Dependency Injection را بر
+      عهده دارد.
+    </p>
+    <p>به زبان ساده:</p>
+    <blockquote>
+      به جای اینکه خودت با new کلاس‌ها را بسازی، Laravel آن‌ها را برایت می‌سازد.
+    </blockquote>
+
+    <h3>بدون Service Container</h3>
+    <pre><code>class PaymentService
+{
+}
+
+class OrderService
+{
+    private PaymentService $payment;
+
+    public function __construct()
+    {
+        $this->payment = new PaymentService();
+    }
+}</code></pre>
+    <p>مشکل:</p>
+    <ul>
+      <li>وابستگی شدید</li>
+      <li>تست سخت</li>
+      <li>جایگزینی پیاده‌سازی سخت</li>
+    </ul>
+
+    <h3>با Service Container</h3>
+    <pre><code>class OrderService
+{
+    public function __construct(
+        private PaymentService $payment
+    ) {
+    }
+}</code></pre>
+    <p>
+      اینجا OrderService خودش PaymentService را نمی‌سازد. Laravel این کار را
+      انجام می‌دهد.
+    </p>
+
+    <h3>Container چگونه Resolve می‌کند؟</h3>
+    <p>فرض کن:</p>
+    <pre><code>class PaymentService
+{
+}
+
+class OrderService
+{
+    public function __construct(
+        PaymentService $payment
+    ) {
+    }
+}</code></pre>
+    <p>وقتی بنویسی:</p>
+    <pre><code>$orderService = app()->make(OrderService::class);</code></pre>
+    <p>Laravel این مراحل را انجام می‌دهد:</p>
+    <ol>
+      <li>Reflection روی OrderService</li>
+      <li>بررسی Constructor</li>
+      <li>پیدا کردن PaymentService</li>
+      <li>ساخت PaymentService</li>
+      <li>تزریق آن به Constructor</li>
+      <li>برگرداندن OrderService</li>
+    </ol>
+    <p>یعنی:</p>
+    <div class="flow">
+      OrderService<br />
+      <span class="arrow">│</span><br />
+      <span class="arrow">▼</span><br />
+      PaymentService<br />
+      <br />
+      Container<br />
+      <span class="arrow">↓</span><br />
+      new PaymentService()<br />
+      <span class="arrow">↓</span><br />
+      new OrderService($payment)
+    </div>
+
+    <h3><code>app()</code> چیست؟</h3>
+    <p>در Laravel: <code>app()</code> همان Application Container است.</p>
+    <p>مثلاً:</p>
+    <pre><code>app()->make(PaymentService::class);
+// یا:
+resolve(PaymentService::class);
+// یا:
+app(PaymentService::class);</code></pre>
+    <p>همه تقریباً یک کار انجام می‌دهند.</p>
+
+    <h3><code>make()</code> چیست؟</h3>
+    <p><code>make()</code> یعنی: این کلاس را برای من Resolve کن.</p>
+    <p>مثلاً:</p>
+    <pre><code>$payment = app()->make(
+    PaymentService::class
+);</code></pre>
+    <p>اگر کلاس وابستگی داشته باشد:</p>
+    <pre><code>class PaymentService
+{
+    public function __construct(
+        Logger $logger
+    ) {
+    }
+}</code></pre>
+    <p>Container اول Logger را می‌سازد. بعد PaymentService را می‌سازد.</p>
+
+    <h3><code>bind()</code> چیست؟</h3>
+    <p>اینجا بخش مهم مصاحبه است.</p>
+    <p>فرض کن Interface داریم.</p>
+    <pre><code>interface PaymentGateway
+{
+    public function pay(float $amount): bool;
+}</code></pre>
+    <p>پیاده‌سازی:</p>
+    <pre><code>class StripeGateway implements PaymentGateway
+{
+    public function pay(float $amount): bool
+    {
+        return true;
+    }
+}</code></pre>
+    <p>Container نمی‌تواند Interface را Instantiate کند.</p>
+    <p>این کد خطا می‌دهد:</p>
+    <pre><code>app()->make(PaymentGateway::class);</code></pre>
+    <p>چون Interface قابل ساخت نیست. باید Binding تعریف کنیم.</p>
+    <pre><code>$this->app->bind(
+    PaymentGateway::class,
+    StripeGateway::class
+);</code></pre>
+    <p>حالا:</p>
+    <pre><code>app()->make(PaymentGateway::class);</code></pre>
+    <p>خروجی: یک شیء از StripeGateway.</p>
+    <p>
+      <code>bind()</code> چه کاری می‌کند؟ به Container می‌گوید: هر وقت کسی
+      PaymentGateway خواست، StripeGateway را بساز.
+    </p>
+
+    <h3><code>bind()</code> و <code>singleton()</code></h3>
+    <div class="interview-answer">این مهم‌ترین سؤال مصاحبه است.</div>
+    <p>
+      <strong><code>bind()</code></strong> – هر بار یک نمونه‌ی جدید می‌سازد.
+    </p>
+    <pre><code>$this->app->bind(
+    PaymentGateway::class,
+    StripeGateway::class
+);
+
+$a = app(PaymentGateway::class);
+$b = app(PaymentGateway::class);
+
+var_dump($a === $b); // false</code></pre>
+    <p>دو شیء متفاوت.</p>
+    <p>
+      <strong><code>singleton()</code></strong> – فقط یک بار ساخته می‌شود.
+    </p>
+    <pre><code>$this->app->singleton(
+    PaymentGateway::class,
+    StripeGateway::class
+);
+
+$a = app(PaymentGateway::class);
+$b = app(PaymentGateway::class);
+
+var_dump($a === $b); // true</code></pre>
+    <p>همان شیء برگردانده می‌شود.</p>
+    <p>
+      <strong>چه زمانی singleton؟</strong> برای سرویس‌هایی که State مشترک دارند.
+      مثلاً:
+    </p>
+    <ul>
+      <li>Config Repository</li>
+      <li>Cache Manager</li>
+      <li>Logger</li>
+      <li>Redis Connection</li>
+      <li>API Client</li>
+    </ul>
+
+    <h3>مثال واقعی</h3>
+    <pre><code>$this->app->singleton(
+    PaymentGateway::class,
+    function ($app) {
+        return new StripeGateway(
+            $app['config']['services.stripe.key']
+        );
+    }
+);</code></pre>
+    <p>اینجا از Closure استفاده کردیم. چرا؟ چون ساخت شیء پیچیده است.</p>
+
+    <h3><code>bind</code> با Closure</h3>
+    <pre><code>$this->app->bind(
+    PaymentGateway::class,
+    function ($app) {
+        return new StripeGateway(
+            $app->make(Logger::class)
+        );
+    }
+);</code></pre>
+    <p>داخل Closure هم می‌توانیم از Container استفاده کنیم.</p>
+
+    <h3>Resolution Chain</h3>
+    <p>فرض کن:</p>
+    <div class="flow">
+      OrderService<br />
+      <span class="arrow">↓</span><br />
+      PaymentGateway<br />
+      <span class="arrow">↓</span><br />
+      StripeGateway<br />
+      <span class="arrow">↓</span><br />
+      HttpClient<br />
+      <span class="arrow">↓</span><br />
+      Logger
+    </div>
+    <p>
+      وقتی <code>app(OrderService::class)</code> را اجرا می‌کنی، Container کل
+      درخت وابستگی را می‌سازد. به این می‌گویند:
+      <strong>Dependency Graph Resolution</strong>
+    </p>
+
+    <h3>سؤال مصاحبه</h3>
+    <p><strong>تفاوت bind و singleton چیست؟</strong></p>
+    <div class="interview-answer">
+      bind() در هر Resolve یک نمونه‌ی جدید ایجاد می‌کند، اما singleton() اولین
+      بار شیء را ایجاد می‌کند و همان نمونه را در تمام درخواست‌های بعدی
+      برمی‌گرداند.
+    </div>
+
+    <h3>سؤال مهم‌تر</h3>
+    <p>
+      <strong
+        >اگر PaymentGateway Interface باشد، Laravel چگونه می‌فهمد StripeGateway
+        را Inject کند؟</strong
+      >
+    </p>
+    <div class="interview-answer">
+      از طریق Binding در Service Container که معمولاً در Service Provider تعریف
+      می‌شود.
+    </div>
+    <p>مثلاً:</p>
+    <pre><code>public function register()
+{
+    $this->app->bind(
+        PaymentGateway::class,
+        StripeGateway::class
+    );
+}</code></pre>
+
+    <h3>پاسخ کامل مصاحبه</h3>
+    <p><strong>Service Container چیست؟</strong></p>
+    <div class="interview-answer">
+      Service Container هسته‌ی Dependency Injection در Laravel است. این
+      Container مسئول Resolve کردن کلاس‌ها و وابستگی‌های آن‌ها است. با استفاده
+      از Reflection می‌تواند کلاس‌ها را به صورت خودکار Instantiate کند و از طریق
+      bind() و singleton() Interfaceها را به پیاده‌سازی‌های مناسب متصل کند. این
+      مکانیزم باعث کاهش Coupling، افزایش تست‌پذیری و اجرای Dependency Inversion
+      Principle می‌شود.
+    </div>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- ۳. Dependency Injection -->
+    <!-- ============================================================ -->
+    <h1 id="sec3">Dependency Injection</h1>
+
+    <div class="box">
+      <p>
+        <strong
+          >نکته‌ی مهم این است که Service Container و Dependency Injection دو
+          مفهوم متفاوت هستند؛ خیلی‌ها این دو را یکی می‌دانند.</strong
+        >
+      </p>
+    </div>
+    <p>
+      Dependency Injection یک الگوی طراحی (Design Pattern) است. Service
+      Container ابزاری است که Laravel برای اجرای Dependency Injection فراهم کرده
+      است.
+    </p>
+
+    <h2>Dependency Injection چیست؟</h2>
+    <p>
+      به جای اینکه یک کلاس وابستگی‌های خودش را بسازد، وابستگی‌ها از بیرون به آن
+      تزریق (Inject) می‌شوند.
+    </p>
+
+    <div class="box bad">
+      <h3>❌ بدون Dependency Injection</h3>
+      <pre><code>class PaymentService
+{
+    public function pay(float $amount): bool
+    {
+        return true;
+    }
+}
+
+class OrderService
+{
+    private PaymentService $payment;
+
+    public function __construct()
+    {
+        $this->payment = new PaymentService();
+    }
+
+    public function checkout()
+    {
+        return $this->payment->pay(1000);
+    }
+}</code></pre>
+      <p>
+        مشکل چیست؟ OrderService خودش PaymentService را می‌سازد. این یعنی Tight
+        Coupling.
+      </p>
+      <p>مشکلات این طراحی:</p>
+      <ul>
+        <li>
+          <strong>تست سخت</strong> – چون همیشه PaymentService واقعی ساخته
+          می‌شود.
+        </li>
+        <li>
+          <strong>تغییر سخت</strong> – اگر بخواهیم Stripe را به Zarinpal تغییر
+          دهیم، باید OrderService را تغییر دهیم.
+        </li>
+        <li>
+          <strong>وابستگی شدید</strong> – OrderService دقیقاً می‌داند
+          PaymentService چگونه ساخته می‌شود.
+        </li>
+      </ul>
+    </div>
+
+    <div class="box good">
+      <h3>✅ با Dependency Injection</h3>
+      <pre><code>class OrderService
+{
+    public function __construct(
+        private PaymentService $payment
+    ) {
+    }
+
+    public function checkout()
+    {
+        return $this->payment->pay(1000);
+    }
+}</code></pre>
+      <p>
+        الان OrderService فقط از PaymentService استفاده می‌کند. ساختن
+        PaymentService مسئولیت OrderService نیست.
+      </p>
+      <p>
+        <strong>چه کسی PaymentService را می‌سازد؟</strong> Laravel Service
+        Container.
+      </p>
+      <p>
+        وقتی <code>app(OrderService::class)</code> را اجرا می‌کنی، Container این
+        کار را انجام می‌دهد:
+      </p>
+      <div class="flow">
+        new PaymentService()<br />
+        <span class="arrow">↓</span><br />
+        new OrderService($paymentService)
+      </div>
+    </div>
+
+    <h2>انواع Dependency Injection</h2>
+    <p>سه نوع اصلی وجود دارد.</p>
+
+    <h3>۱. Constructor Injection (مهم‌ترین)</h3>
+    <p>رایج‌ترین روش در Laravel.</p>
+    <pre><code>class OrderService
+{
+    public function __construct(
+        private PaymentService $payment
+    ) {
+    }
+}</code></pre>
+    <p>مزایا:</p>
+    <ul>
+      <li>وابستگی اجباری است.</li>
+      <li>Immutable می‌شود.</li>
+      <li>تست راحت‌تر است.</li>
+      <li>واضح است.</li>
+    </ul>
+    <p>در Laravel بهترین روش همین است.</p>
+
+    <h3>۲. Method Injection</h3>
+    <p>Laravel از این روش هم استفاده می‌کند. مثلاً در Controller:</p>
+    <pre><code>class OrderController
+{
+    public function store(
+        PaymentService $payment
+    ) {
+        $payment->pay(1000);
+    }
+}</code></pre>
+    <p>
+      Laravel هنگام اجرای متد، PaymentService را Inject می‌کند. این بسیار رایج
+      است.
+    </p>
+
+    <h3>۳. Setter Injection</h3>
+    <p>کمتر استفاده می‌شود.</p>
+    <pre><code>class OrderService
+{
+    private PaymentService $payment;
+
+    public function setPaymentService(
+        PaymentService $payment
+    ) {
+        $this->payment = $payment;
+    }
+}</code></pre>
+    <p>
+      مشکل: ممکن است فراموش کنیم set را صدا بزنیم. به همین دلیل در Laravel
+      معمولاً Constructor Injection ترجیح داده می‌شود.
+    </p>
+
+    <h2>Dependency Injection با Interface</h2>
+    <p>اینجا بخش مهم مصاحبه است.</p>
+    <pre><code>interface PaymentGateway
+{
+    public function pay(float $amount): bool;
+}
+
+class StripeGateway implements PaymentGateway
+{
+    public function pay(float $amount): bool
+    {
+        return true;
+    }
+}
+
+class OrderService
+{
+    public function __construct(
+        private PaymentGateway $gateway
+    ) {
+    }
+}</code></pre>
+    <p><strong>سؤال:</strong> Laravel چگونه PaymentGateway را Inject می‌کند؟</p>
+    <div class="interview-answer">
+      از طریق Binding.
+      <pre><code>$this->app->bind(
+    PaymentGateway::class,
+    StripeGateway::class
+);</code></pre>
+      وقتی OrderService ساخته می‌شود: Container می‌بیند PaymentGateway لازم است.
+      Binding وجود دارد. StripeGateway را می‌سازد. Inject می‌کند.
+    </div>
+
+    <h2>چرا Constructor Injection بهتر است؟</h2>
+    <p>این سؤال خیلی رایج است.</p>
+    <ul>
+      <li>
+        <strong>دلیل اول: وابستگی‌ها مشخص هستند</strong> – با نگاه به
+        Constructor می‌فهمی کلاس به چه چیزهایی نیاز دارد.
+      </li>
+      <li>
+        <strong>دلیل دوم: جلوگیری از Null</strong> – اگر Dependency Inject نشود،
+        اصلاً کلاس ساخته نمی‌شود.
+      </li>
+      <li><strong>دلیل سوم: تست</strong> – به راحتی Mock تزریق می‌شود.</li>
+    </ul>
+    <pre><code>$mock = Mockery::mock(PaymentGateway::class);
+$service = new OrderService($mock);</code></pre>
+
+    <h2>ارتباط DI با DIP</h2>
+    <p>
+      Dependency Injection ابزار اجرای Dependency Inversion Principle است. DIP
+      می‌گوید: به Interface وابسته شو. DI می‌گوید: آن Interface را از بیرون
+      تزریق کن.
+    </p>
+
+    <h3>سؤال مهم مصاحبه</h3>
+    <p><strong>تفاوت Dependency Injection و Service Container چیست؟</strong></p>
+    <div class="interview-answer">
+      Dependency Injection یک الگوی طراحی است که وابستگی‌ها را از بیرون به کلاس
+      تزریق می‌کند. Service Container مکانیزمی در Laravel است که این وابستگی‌ها
+      را Resolve و Inject می‌کند. یعنی DI = Principle / Pattern و Container =
+      Implementation.
+    </div>
+
+    <h3>سؤال مهم‌تر</h3>
+    <p>
+      <strong
+        >آیا Laravel بدون Service Container هم Dependency Injection
+        دارد؟</strong
+      >
+    </p>
+    <div class="interview-answer">
+      بله. مثلاً:
+      <pre><code>$payment = new PaymentService();
+$order = new OrderService($payment);</code></pre>
+      این هم Dependency Injection است. فقط دستی انجام شده است. Laravel این کار
+      را به صورت خودکار انجام می‌دهد.
+    </div>
+
+    <h3>پاسخ حرفه‌ای مصاحبه</h3>
+    <p><strong>Dependency Injection چیست و چه مزیتی دارد؟</strong></p>
+    <div class="interview-answer">
+      Dependency Injection یعنی وابستگی‌های یک کلاس از بیرون به آن تزریق شوند،
+      نه اینکه داخل کلاس ساخته شوند. در Laravel معمولاً از Constructor Injection
+      استفاده می‌کنیم و Service Container مسئول Resolve کردن وابستگی‌ها است. این
+      کار باعث کاهش Coupling، افزایش تست‌پذیری، رعایت Dependency Inversion
+      Principle و امکان جایگزینی پیاده‌سازی‌ها بدون تغییر کلاس مصرف‌کننده
+      می‌شود.
+    </div>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- ۴. Service Providers -->
+    <!-- ============================================================ -->
+    <h1 id="sec4">Service Providers</h1>
+
+    <p>Bindingها را کجا تعریف می‌کنید؟ پاسخ: Service Providers.</p>
+    <p>
+      Service Providers محل ثبت (register) و راه‌اندازی (boot) سرویس‌های Laravel
+      هستند.
+    </p>
+    <p>
+      تقریباً تمام قابلیت‌های Laravel (Routing، Events، Auth، Validation، Queue،
+      Cache و...) از طریق Service Providerها به برنامه متصل می‌شوند.
+    </p>
+
+    <h2>Service Provider چیست؟</h2>
+    <p>از <code>Illuminate\Support\ServiceProvider</code> ارث‌بری می‌کند.</p>
+    <pre><code>namespace App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function register()
+    {
+    }
+
+    public function boot()
+    {
+    }
+}</code></pre>
+    <p>
+      دو متد مهم دارد: <code>register()</code> و <code>boot()</code>. این دو را
+      باید کاملاً بفهمی.
+    </p>
+
+    <h3>نقش <code>register()</code></h3>
+    <p>
+      <code>register()</code> برای ثبت سرویس‌ها در Service Container است. اینجا
+      Binding انجام می‌دهیم.
+    </p>
+    <p>مثال:</p>
+    <pre><code>interface PaymentGateway
+{
+    public function pay(float $amount): bool;
+}
+
+class StripeGateway implements PaymentGateway
+{
+    public function pay(float $amount): bool
+    {
+        return true;
+    }
+}
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function register()
+    {
+        $this->app->bind(
+            PaymentGateway::class,
+            StripeGateway::class
+        );
+    }
+}</code></pre>
+    <p>
+      الان هر جا PaymentGateway Inject شود، Laravel StripeGateway را تزریق
+      می‌کند.
+    </p>
+
+    <h3>نقش <code>boot()</code></h3>
+    <p>
+      <code>boot()</code> برای راه‌اندازی سرویس‌ها بعد از ثبت همه Providerها
+      است. یعنی وقتی تمام Bindingها انجام شد، boot() اجرا می‌شود.
+    </p>
+    <p>مثال:</p>
+    <pre><code>public function boot()
+{
+    View::share('appName', config('app.name'));
+}</code></pre>
+    <p>یا</p>
+    <pre><code>use Illuminate\Support\Facades\Route;
+
+public function boot()
+{
+    Route::pattern('id', '[0-9]+');
+}</code></pre>
+
+    <h2>ترتیب اجرا</h2>
+    <div class="interview-answer">این سؤال مصاحبه‌ای مهم است.</div>
+    <p>
+      Laravel ابتدا register همه Providerها را اجرا می‌کند. بعد boot همه
+      Providerها را اجرا می‌کند.
+    </p>
+    <div class="flow">
+      Provider A register<br />
+      Provider B register<br />
+      Provider C register<br />
+      <span class="arrow">↓</span><br />
+      Provider A boot<br />
+      Provider B boot<br />
+      Provider C boot
+    </div>
+    <p>
+      دلیل این طراحی چیست؟ چون در boot() ممکن است به سرویس Provider دیگری نیاز
+      داشته باشی. اگر اول boot اجرا می‌شد، شاید آن سرویس هنوز ثبت نشده بود.
+    </p>
+
+    <h3>مثال مهم</h3>
+    <p>فرض کن:</p>
+    <p>Provider اول:</p>
+    <pre><code>public function register()
+{
+    $this->app->singleton(
+        PaymentGateway::class,
+        StripeGateway::class
+    );
+}</code></pre>
+    <p>Provider دوم:</p>
+    <pre><code>public function boot()
+{
+    $gateway = app(PaymentGateway::class);
+}</code></pre>
+    <p>این کار درست است. چون register() قبلاً اجرا شده است.</p>
+
+    <h3>چه چیزهایی در register؟</h3>
+    <p>
+      قانون مهم: در register() فقط Binding انجام بده. مثل: bind, singleton,
+      scoped, instance
+    </p>
+    <pre><code>public function register()
+{
+    $this->app->singleton(
+        PaymentGateway::class,
+        StripeGateway::class
+    );
+}</code></pre>
+
+    <h3>چه چیزهایی در boot؟</h3>
+    <p>
+      در boot() کارهایی که به سرویس‌های دیگر وابسته‌اند. مثل: Route, View
+      Composer, Model Observer, Validation Rule, Event Listener, Blade Directive
+    </p>
+    <p>مثال Observer:</p>
+    <pre><code>use App\Models\Order;
+use App\Observers\OrderObserver;
+
+public function boot()
+{
+    Order::observe(OrderObserver::class);
+}</code></pre>
+    <p>اگر این را در register بنویسی، ممکن است مشکل ایجاد شود.</p>
+
+    <h3>مثال واقعی AppServiceProvider</h3>
+    <pre><code>class AppServiceProvider extends ServiceProvider
+{
+    public function register()
+    {
+        $this->app->bind(
+            PaymentGateway::class,
+            StripeGateway::class
+        );
+
+        $this->app->singleton(
+            ExchangeRateService::class,
+            function ($app) {
+                return new ExchangeRateService(
+                    config('services.exchange.key')
+                );
+            }
+        );
+    }
+
+    public function boot()
+    {
+        Order::observe(OrderObserver::class);
+
+        View::share(
+            'appName',
+            config('app.name')
+        );
+    }
+}</code></pre>
+    <p>این یک نمونه‌ی مصاحبه‌ای خوب است.</p>
+
+    <h3>چرا Binding را در register انجام می‌دهیم؟</h3>
+    <p>
+      چون Service Container در مرحله‌ی ساخت Application به Bindingها نیاز دارد.
+      اگر Binding را در boot انجام دهی، ممکن است بعضی سرویس‌ها قبل از آن Resolve
+      شوند.
+    </p>
+
+    <h3>سؤال مهم مصاحبه</h3>
+    <p><strong>تفاوت register و boot چیست؟</strong></p>
+    <div class="interview-answer">
+      register() برای ثبت سرویس‌ها و Bindingها در Service Container است و باید
+      فقط عملیات Registration انجام دهد. boot() بعد از ثبت تمام Providerها اجرا
+      می‌شود و برای راه‌اندازی سرویس‌ها، ثبت Observerها، View Composerها، Route
+      Patternها و سایر تنظیماتی که به سرویس‌های دیگر وابسته هستند استفاده
+      می‌شود.
+    </div>
+
+    <h3>سؤال بعدی</h3>
+    <p>
+      <strong
+        >اگر بخواهم PaymentGateway را به StripeGateway Bind کنم، در register
+        می‌نویسم یا boot؟</strong
+      >
+    </p>
+    <div class="interview-answer">
+      register، چون Binding مربوط به Container است.
+    </div>
+
+    <h3>سؤال مهم‌تر</h3>
+    <p>
+      <strong>آیا می‌توانیم در boot از Service Container استفاده کنیم؟</strong>
+    </p>
+    <div class="interview-answer">
+      بله. مثلاً:
+      <pre><code>public function boot()
+{
+    $gateway = app(PaymentGateway::class);
+}</code></pre>
+      چون در این مرحله همه Providerها Register شده‌اند.
+    </div>
+
+    <h3>ارتباط با Facades</h3>
+    <p>
+      وقتی می‌نویسی: <code>Cache::get('key');</code> این Facade از طریق Service
+      Provider مربوط به Cache ثبت شده است. یعنی پشت Facadeها هم Service Provider
+      وجود دارد.
+    </p>
+
+    <h3>پاسخ کامل مصاحبه</h3>
+    <p><strong>Service Provider چیست؟</strong></p>
+    <div class="interview-answer">
+      Service Provider نقطه‌ی مرکزی Bootstrapping در Laravel است. از طریق
+      register() سرویس‌ها و Interface Bindingها را در Service Container ثبت
+      می‌کنیم و از طریق boot() بعد از ثبت تمام Providerها، سرویس‌ها را
+      راه‌اندازی می‌کنیم؛ مانند ثبت Observerها، View Composerها، Route Patternها
+      و سایر تنظیمات وابسته به Container.
+    </div>
+    <p>
+      <strong
+        >اگر داخل boot() یک Interface را Bind کنیم، چه مشکلی ممکن است ایجاد
+        شود؟</strong
+      >
+    </p>
+    <div class="interview-answer">
+      ممکن است قبل از اجرای boot() آن Interface Resolve شده باشد، بنابراین
+      Binding دیر انجام می‌شود. به همین دلیل Bindingها باید در register() انجام
+      شوند.
+    </div>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- ۵. Facades -->
+    <!-- ============================================================ -->
+    <h1 id="sec5">Facade چیست؟ آیا واقعاً Static است؟</h1>
+
+    <p>
+      اگر این سؤال را خوب جواب بدهی، نشان می‌دهد که Service Container، Static
+      Method، و Laravel Internals را فهمیده‌ای.
+    </p>
+
+    <h2>Facade چیست؟</h2>
+    <p>
+      <strong>تعریف ساده:</strong> Facade یک Proxy (واسط) است که دسترسی راحت به
+      سرویس‌های داخل Service Container را فراهم می‌کند.
+    </p>
+    <p>وقتی می‌نویسی:</p>
+    <pre><code>Cache::get('key');
+Auth::user();
+Log::info('message');
+DB::table('users')->get();</code></pre>
+    <p>
+      در ظاهر شبیه متد Static است. اما در واقع Static واقعی نیست. این مهم‌ترین
+      نکته‌ی مصاحبه است.
+    </p>
+
+    <h3>تصور اشتباه</h3>
+    <p>بعضی‌ها فکر می‌کنند <code>Cache::get('key');</code> یعنی:</p>
+    <pre><code>class Cache
+{
+    public static function get($key)
+    {
+    }
+}</code></pre>
+    <p>اما این درست نیست.</p>
+
+    <h3>پشت صحنه</h3>
+    <p>
+      Facade در Laravel یک کلاس است که از
+      <code>Illuminate\Support\Facades\Facade</code> ارث‌بری می‌کند.
+    </p>
+    <pre><code>class Cache extends Facade
+{
+    protected static function getFacadeAccessor()
+    {
+        return 'cache';
+    }
+}</code></pre>
+    <p>
+      این متد <code>getFacadeAccessor()</code> بسیار مهم است. این متد می‌گوید:
+      وقتی کسی Cache::get() را صدا زد، برو سرویس 'cache' را از Container بگیر.
+    </p>
+
+    <h3>اتفاق واقعی</h3>
+    <p>
+      وقتی می‌نویسی <code>Cache::get('key');</code> تقریباً این اتفاق می‌افتد:
+    </p>
+    <pre><code>$cache = app('cache');
+$cache->get('key');</code></pre>
+    <p>یعنی Facade فقط یک میانبر است.</p>
+
+    <h3>چرا Static به نظر می‌رسد؟</h3>
+    <p>Facade از متد جادویی PHP استفاده می‌کند: <code>__callStatic()</code></p>
+    <p>داخل کلاس پایه Facade:</p>
+    <pre><code>public static function __callStatic($method, $args)
+{
+    $instance = static::resolveFacadeInstance(
+        static::getFacadeAccessor()
+    );
+
+    return $instance->$method(...$args);
+}</code></pre>
+    <p>
+      پس <code>Cache::get('key');</code> تبدیل می‌شود به
+      <code>$instance->get('key');</code> روی شیء واقعی.
+    </p>
+
+    <h3>ارتباط با Service Container</h3>
+    <p>اینجا Facade به Container وصل می‌شود.</p>
+    <div class="flow">
+      Cache::get()<br />
+      <span class="arrow">↓</span><br />
+      Facade<br />
+      <span class="arrow">↓</span><br />
+      Service Container<br />
+      <span class="arrow">↓</span><br />
+      CacheManager instance
+    </div>
+    <p>بنابراین Facade بدون Container کار نمی‌کند.</p>
+
+    <h3>مثال با DB</h3>
+    <p>
+      وقتی <code>DB::table('users')->get();</code> را اجرا می‌کنی، Facade 'db'
+      را از Container می‌گیرد. آن سرویس Connection یا Database Manager است. بعد
+      <code>table()</code> روی آن شیء اجرا می‌شود.
+    </p>
+
+    <h3>مزیت Facade</h3>
+    <ul>
+      <li>
+        <strong>کد کوتاه:</strong> به جای
+        <code>$cache = app('cache'); $cache->get('key');</code> می‌نویسی
+        <code>Cache::get('key');</code>
+      </li>
+      <li>
+        <strong>خوانایی:</strong> <code>Log::info();</code>,
+        <code>Cache::put();</code>, <code>Storage::disk();</code> واضح‌تر است.
+      </li>
+    </ul>
+
+    <h3>آیا Facade با Dependency Injection تضاد دارد؟</h3>
+    <div class="interview-answer">
+      این سؤال مهم مصاحبه است. جواب: نه، ولی Trade-off دارد.
+    </div>
+    <p>مثال DI:</p>
+    <pre><code>class OrderService
+{
+    public function __construct(
+        private CacheRepository $cache
+    ) {
+    }
+}</code></pre>
+    <p>وابستگی واضح است.</p>
+
+    <h3>آیا Facade واقعاً Static است؟</h3>
+    <div class="interview-answer">
+      خیر. Facade فقط ظاهری Static دارد. متدهای آن از طریق __callStatic به یک
+      شیء واقعی که داخل Service Container Resolve می‌شود Delegate می‌شوند.
+    </div>
+
+    <h3>سؤال بعدی</h3>
+    <p><strong>تفاوت Facade و Helper Function چیست؟</strong></p>
+    <pre><code>cache('key');
+Cache::get('key');</code></pre>
+    <p>
+      Facade: قابل Mock, قابل Extend, وابسته به Container. Helper: تابع معمولی،
+      معمولاً Wrapper ساده.
+    </p>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- ۶. Middleware -->
+    <!-- ============================================================ -->
+    <h1 id="sec6">Middleware</h1>
+
+    <p>
+      Middleware یک Filter یا Pipeline Layer است که درخواست HTTP را قبل از رسیدن
+      به Controller پردازش می‌کند و می‌تواند درخواست را ادامه دهد، تغییر دهد یا
+      متوقف کند.
+    </p>
+
+    <h3>نقش Closure <code>$next</code></h3>
+    <pre><code>public function handle(
+    Request $request,
+    Closure $next
+) {
+    return $next($request);
+}</code></pre>
+    <p>
+      <code>$next</code> یعنی: درخواست را به Middleware بعدی یا Controller ارسال
+      کن.
+    </p>
+    <p>اگر <code>$next</code> را صدا نزنی، درخواست متوقف می‌شود.</p>
+    <pre><code>public function handle(Request $request, Closure $next) {
+    return response()->json([
+        'message' => 'Blocked'
+    ], 403);
+}</code></pre>
+    <p>Controller هرگز اجرا نمی‌شود.</p>
+
+    <h3>مثال Authentication</h3>
+    <pre><code>public function handle(Request $request, Closure $next) {
+    if (!$request->user()) {
+        return redirect('/login');
+    }
+
+    return $next($request);
+}</code></pre>
+    <p>
+      اگر کاربر Login نباشد: درخواست متوقف می‌شود. Redirect انجام می‌شود. اگر
+      Login باشد: Middleware بعدی اجرا می‌شود.
+    </p>
+
+    <h3>Before Middleware</h3>
+    <p>این نوع Middleware قبل از Controller اجرا می‌شود.</p>
+    <pre><code>public function handle(Request $request, Closure $next) {
+    Log::info('Request started');
+    return $next($request);
+}</code></pre>
+    <div class="flow">
+      Request<br />
+      <span class="arrow">↓</span><br />
+      Log<br />
+      <span class="arrow">↓</span><br />
+      Controller
+    </div>
+
+    <h3>After Middleware</h3>
+    <p>می‌توانیم بعد از اجرای Controller هم کد اجرا کنیم.</p>
+    <pre><code>public function handle(Request $request, Closure $next) {
+    $response = $next($request);
+    $response->headers->set('X-App', 'Laravel');
+    return $response;
+}</code></pre>
+    <div class="flow">
+      Request<br />
+      <span class="arrow">↓</span><br />
+      Controller<br />
+      <span class="arrow">↓</span><br />
+      Modify Response<br />
+      <span class="arrow">↓</span><br />
+      Response
+    </div>
+    <p>این بسیار مهم است.</p>
+
+    <h3>Global Middleware</h3>
+    <p>
+      روی همه درخواست‌ها اجرا می‌شود. مثال: TrustProxies, HandleCors,
+      PreventRequestsDuringMaintenance, ValidatePostSize, TrimStrings. در
+      نسخه‌های جدید Laravel در فایل Bootstrap ثبت می‌شوند.
+    </p>
+
+    <h3>Route Middleware</h3>
+    <p>فقط روی Routeهای مشخص اجرا می‌شود.</p>
+    <pre><code>Route::get('/admin', function () {
+    //
+})->middleware('auth');</code></pre>
+
+    <h3>Middleware Parameter</h3>
+    <p>Laravel اجازه می‌دهد پارامتر ارسال کنیم.</p>
+    <pre><code>Route::get('/admin')->middleware('role:admin');
+
+public function handle(Request $request, Closure $next, string $role) {
+    if ($request->user()->role !== $role) {
+        abort(403);
+    }
+    return $next($request);
+}</code></pre>
+
+    <h3>Middleware Priority</h3>
+    <p>
+      گاهی ترتیب اجرا مهم است. مثلاً Session, Authentication, Authorization. اگر
+      Authorization قبل از Authentication اجرا شود، مشکل ایجاد می‌شود. Laravel
+      برای بعضی Middlewareها Priority مشخص می‌کند.
+    </p>
+
+    <h3>Terminable Middleware</h3>
+    <p>
+      این یکی سؤال سطح Mid-Level است. بعضی Middlewareها بعد از ارسال Response هم
+      اجرا می‌شوند.
+    </p>
+    <pre><code>class LogRequestTime
+{
+    public function handle($request, Closure $next) {
+        return $next($request);
+    }
+
+    public function terminate($request, $response) {
+        Log::info('Request finished');
+    }
+}</code></pre>
+    <div class="flow">
+      Request<br />
+      <span class="arrow">↓</span><br />
+      Controller<br />
+      <span class="arrow">↓</span><br />
+      Response sent<br />
+      <span class="arrow">↓</span><br />
+      terminate()
+    </div>
+    <p>این برای: Logging, Analytics, Cleanup مناسب است.</p>
+
+    <h3>ارتباط با Pipeline Pattern</h3>
+    <p>
+      Laravel Middleware بر پایه Pipeline Pattern ساخته شده است. هر Middleware:
+      Request را دریافت می‌کند. کاری انجام می‌دهد. Request را به مرحله بعد
+      می‌دهد.
+    </p>
+
+    <h3>تفاوت Middleware و Controller</h3>
+    <p>
+      Middleware: احراز هویت, Rate Limiting, CORS, Logging, Permission, Locale.
+      Controller: Business Logic, Database, Payment, Response. Middleware نباید
+      منطق اصلی برنامه را انجام دهد.
+    </p>
+
+    <h3>سؤال مهم مصاحبه</h3>
+    <p><strong>چرا از Middleware استفاده می‌کنیم؟</strong></p>
+    <div class="interview-answer">
+      برای جدا کردن Cross-Cutting Concerns از Business Logic.
+    </div>
+    <p>مثلاً بد:</p>
+    <pre><code>class OrderController
+{
+    public function index()
+    {
+        if (!auth()->check()) {
+            abort(401);
+        }
+        // ...
+    }
+}</code></pre>
+    <p>خوب:</p>
+    <pre><code>Route::middleware('auth')
+    ->group(function () {
+        Route::get('/orders', [OrderController::class, 'index']);
+    });</code></pre>
+    <p>Authentication از Controller خارج شده است.</p>
+
+    <h3>Middleware چیست و نقش <code>$next</code> چیست؟</h3>
+    <div class="interview-answer">
+      Middleware یک لایه بین Request و Controller است که می‌تواند درخواست را
+      بررسی، تغییر یا متوقف کند. متد handle() درخواست را دریافت می‌کند و Closure
+      $next نماینده مرحله بعدی Pipeline است. با فراخوانی $next($request) درخواست
+      به Middleware بعدی یا Controller ارسال می‌شود و بعد از دریافت Response نیز
+      می‌توان آن را تغییر داد.
+    </div>
+
+    <h3>
+      تفاوت <code>handle()</code> و <code>terminate()</code> در Middleware چیست؟
+    </h3>
+    <div class="interview-answer">
+      handle() قبل و در حین پردازش درخواست اجرا می‌شود، اما terminate() بعد از
+      ارسال Response به کاربر اجرا می‌شود و برای کارهای پس‌زمینه مثل Logging و
+      Analytics مناسب است.
+    </div>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- ۷. Validation -->
+    <!-- ============================================================ -->
+    <h1 id="sec7">Validation در Laravel</h1>
+
+    <p>ساده‌ترین روش:</p>
+    <pre><code>public function store(Request $request)
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|unique:users,email',
+        'password' => 'required|min:8',
+    ]);
+
+    User::create($validated);
+}</code></pre>
+    <p>
+      اگر Validation شکست بخورد، Laravel به صورت خودکار: Redirect (در Web) یا
+      JSON Error (در API) برمی‌گرداند. این رفتار خودکار یکی از مزیت‌های Laravel
+      است.
+    </p>
+
+    <h3>مهم‌ترین Ruleها</h3>
+    <p>این‌ها را باید حفظ نباشی، ولی روان استفاده کنی.</p>
+
+    <h3>Validation با آرایه</h3>
+    <pre><code>$request->validate([
+    'items' => 'required|array',
+    'items.*.product_id' => 'required|exists:products,id',
+    'items.*.quantity' => 'required|integer|min:1',
+]);</code></pre>
+
+    <h2>Form Request چیست؟</h2>
+    <p>یک کلاس جدا برای Validation و Authorization.</p>
+    <pre><code>class StoreUserRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email',
+        ];
+    }
+}</code></pre>
+    <p>Controller:</p>
+    <pre><code>public function store(StoreUserRequest $request)
+{
+    User::create($request->validated());
+}</code></pre>
+    <p>خیلی تمیزتر شد.</p>
+
+    <h3><code>authorize()</code></h3>
+    <p>این متد بسیار مهم است. اینجا می‌توانی مجوز دسترسی را بررسی کنی.</p>
+    <pre><code>public function authorize(): bool
+{
+    return auth()->user()->isAdmin();
+}</code></pre>
+    <p>
+      اگر false برگرداند، Laravel به صورت خودکار برمی‌گرداند. این یعنی
+      Authorization قبل از Controller انجام می‌شود.
+    </p>
+
+    <h3><code>rules()</code></h3>
+    <p>تمام Ruleها اینجا قرار می‌گیرند.</p>
+    <pre><code>public function rules(): array
+{
+    return [
+        'title' => 'required|string|max:255',
+        'content' => 'required|string',
+        'category_id' => 'required|exists:categories,id',
+    ];
+}</code></pre>
+
+    <h3><code>validated()</code></h3>
+    <p>
+      بعد از Validation: <code>$data = $request->validated();</code> فقط
+      داده‌های معتبر را برمی‌گرداند. این از نظر امنیتی بهتر است.
+    </p>
+    <p>
+      <strong>تفاوت <code>validated()</code> و <code>all()</code></strong> –
+      <code>all()</code> تمام داده‌ها را برمی‌گرداند، اما
+      <code>validated()</code> فقط داده‌هایی که Validation شده‌اند.
+    </p>
+
+    <h3>چگونه هنگام Update از unique استفاده کنیم؟</h3>
+    <p>کاربر ایمیل خودش را هم نمی‌تواند ذخیره کند.</p>
+    <pre><code>use Illuminate\Validation\Rule;
+
+'email' => [
+    'required',
+    'email',
+    Rule::unique('users', 'email')
+        ->ignore($this->route('user')),
+]</code></pre>
+
+    <h3>Custom Messages</h3>
+    <pre><code>public function messages(): array
+{
+    return [
+        'name.required' => 'نام الزامی است',
+        'email.email' => 'ایمیل معتبر نیست',
+    ];
+}</code></pre>
+
+    <h3>Custom Attributes</h3>
+    <pre><code>public function attributes(): array
+{
+    return [
+        'email' => 'آدرس ایمیل',
+    ];
+}</code></pre>
+
+    <h3><code>prepareForValidation()</code></h3>
+    <p>یکی از سؤالات سطح Mid-Level. قبل از Validation اجرا می‌شود.</p>
+    <pre><code>protected function prepareForValidation()
+{
+    $this->merge([
+        'email' => strtolower($this->email),
+        'slug' => Str::slug($this->title),
+    ]);
+}</code></pre>
+    <p>کاربرد: Trim, Lowercase, Generate Slug, Merge Data</p>
+
+    <h3><code>passedValidation()</code></h3>
+    <p>بعد از موفقیت Validation اجرا می‌شود.</p>
+    <pre><code>protected function passedValidation()
+{
+    $this->replace([
+        'name' => strtoupper($this->name),
+    ]);
+}</code></pre>
+    <p>کمتر استفاده می‌شود.</p>
+
+    <h3>Rule Object</h3>
+    <p>برای Validation پیچیده.</p>
+    <pre><code>php artisan make:rule ValidCoupon</code></pre>
+    <pre><code>class ValidCoupon implements ValidationRule
+{
+    public function validate(
+        string $attribute,
+        mixed $value,
+        Closure $fail
+    ): void {
+        if ($value !== 'DISCOUNT10') {
+            $fail('کد تخفیف معتبر نیست.');
+        }
+    }
+}</code></pre>
+    <p>استفاده: <code>'coupon' => [new ValidCoupon]</code></p>
+
+    <h3>Validation در API</h3>
+    <p>Form Request در API هم بهترین روش است. در صورت خطا:</p>
+    <pre><code>{
+    "message": "The given data was invalid.",
+    "errors": {
+        "email": [
+            "The email field is required."
+        ]
+    }
+}</code></pre>
+
+    <h3>چرا Form Request بهتر از validate داخل Controller است؟</h3>
+    <div class="interview-answer">
+      Form Request باعث جداسازی Validation و Authorization از Business Logic
+      می‌شود، Controller را تمیزتر می‌کند، قابلیت استفاده مجدد دارد، تست‌پذیری
+      را افزایش می‌دهد و امکان استفاده از متدهایی مثل authorize(),
+      prepareForValidation(), messages() و validated() را فراهم می‌کند.
+    </div>
+
+    <h3>Form Request چیست؟</h3>
+    <div class="interview-answer">
+      Form Request یک کلاس اختصاصی برای مدیریت Validation و Authorization است.
+      Laravel قبل از اجرای Controller متد authorize() را اجرا می‌کند و سپس
+      rules() را بررسی می‌کند. در صورت موفقیت Validation می‌توان از validated()
+      برای دریافت داده‌های معتبر استفاده کرد. این رویکرد باعث رعایت SRP، تمیزتر
+      شدن Controller و افزایش تست‌پذیری می‌شود.
+    </div>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- ۸. Security & Sanctum -->
+    <!-- ============================================================ -->
+    <h1 id="sec8">امنیت و Sanctum</h1>
+
+    <h2>Laravel چه مکانیزم‌هایی برای امنیت دارد؟</h2>
+    <div class="interview-answer">
+      Laravel برای جلوگیری از SQL Injection از Prepared Statement در Eloquent و
+      Query Builder استفاده می‌کند، برای Mass Assignment از $fillable و
+      $guarded، برای CSRF از Token، برای XSS از Blade Escaping، برای Passwordها
+      از Hashing مانند bcrypt و argon2، و برای جلوگیری از Abuse از Rate Limiting
+      استفاده می‌کند.
+    </div>
+
+    <h2>Sanctum بهتر است یا JWT؟</h2>
+    <div class="interview-answer">
+      بستگی به معماری دارد. برای اکثر APIهای Laravel، SPA و Mobile ساده، Sanctum
+      انتخاب مناسب‌تری است چون با Laravel هماهنگ است. JWT زمانی مناسب است که
+      نیاز به Stateless Authentication یا معماری‌های توزیع‌شده داشته باشیم.
+    </div>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- ۹. Gates, Policies, Authorization -->
+    <!-- ============================================================ -->
+    <h1 id="sec9">Gates, Policies, Authorization</h1>
+
+    <p>سه ابزار مهم: Gates, Policies, Middleware</p>
+
+    <h2>Gate چیست؟</h2>
+    <p>
+      Gate برای Authorization ساده است. مثال: آیا کاربر می‌تواند Delete Post
+      کند؟ در AuthServiceProvider تعریف می‌شود.
+    </p>
+    <pre><code>Gate::define('delete-post', function ($user, $post) {
+    return $user->id === $post->user_id;
+});</code></pre>
+    <p>استفاده: <code>Gate::allows('delete-post', $post)</code></p>
+
+    <h2>Policy چیست؟</h2>
+    <p>
+      Policy کلاس مخصوص Authorization برای یک Model است. مثلاً
+      <code>PostPolicy</code>. متدها: <code>view()</code>,
+      <code>create()</code>, <code>update()</code>, <code>delete()</code>.
+    </p>
+    <p>مثال داخل Policy:</p>
+    <pre><code>public function update(User $user, Post $post)
+{
+    return $user->id === $post->user_id;
+}</code></pre>
+    <p>یعنی فقط صاحب Post می‌تواند Update کند.</p>
+
+    <h3>تفاوت Gate و Policy</h3>
+    <table>
+      <tr>
+        <th>Gate</th>
+        <th>Policy</th>
+      </tr>
+      <tr>
+        <td>ساده</td>
+        <td>ساختاریافته</td>
+      </tr>
+      <tr>
+        <td>بدون Model</td>
+        <td>مرتبط با Model</td>
+      </tr>
+      <tr>
+        <td>چند شرط ساده</td>
+        <td>CRUD روی Resource</td>
+      </tr>
+    </table>
+
+    <h3>Middleware Authorization</h3>
+    <pre><code>Route::middleware('can:update,post')->get('/posts/{post}/edit', ...);</code></pre>
+    <p>Laravel Policy را بررسی می‌کند.</p>
+
+    <h3>Laravel Auth Flow در API</h3>
+    <p>مثلاً React + Laravel:</p>
+    <div class="flow">
+      React Login<br />
+      <span class="arrow">|</span><br />
+      POST /login<br />
+      <span class="arrow">|</span><br />
+      Laravel Auth<br />
+      <span class="arrow">|</span><br />
+      Create Token<br />
+      <span class="arrow">|</span><br />
+      Return Token<br />
+      <span class="arrow">|</span><br />
+      React stores Token<br />
+      <span class="arrow">|</span><br />
+      Request API<br />
+      <span class="arrow">|</span><br />
+      Bearer Token<br />
+      <span class="arrow">|</span><br />
+      Sanctum Middleware<br />
+      <span class="arrow">|</span><br />
+      Controller
+    </div>
+
+    <h3>تفاوت Authentication و Authorization چیست؟</h3>
+    <div class="interview-answer">
+      Authentication فرآیند شناسایی کاربر است و مشخص می‌کند کاربر چه کسی است،
+      اما Authorization بعد از Authentication بررسی می‌کند که آیا آن کاربر اجازه
+      انجام عملیات مشخصی را دارد یا نه.
+    </div>
+
+    <h3>چرا Policy بهتر از گذاشتن شرط داخل Controller است؟</h3>
+    <div class="interview-answer">
+      چون Policy منطق Authorization را از Business Logic جدا می‌کند، قابل
+      استفاده مجدد است، تست‌پذیری را افزایش می‌دهد و باعث تمیزتر شدن Controller
+      می‌شود.
+    </div>
+
+    <h3>
+      من در قسمت پروژه خودم چطور از policy , laravel-permission استفاده کردم
+    </h3>
+    <blockquote>
+      «در پروژه ما Multi-tenant بود. Policy را برای Tenant Isolation استفاده
+      کردم؛ یعنی بررسی می‌کردم که آیا کاربر به همین وب‌سایت یا Tenant تعلق دارد
+      و اصلاً اجازه دسترسی به این Resource را دارد یا نه. بعد از عبور از این
+      مرحله، از spatie/laravel-permission برای بررسی Permissionهای عملیاتی مثل
+      create, edit, delete استفاده می‌کردم. بنابراین Policy مسئول قوانین
+      Business و محدودیت Tenant بود، و laravel-permission مسئول Role و
+      Permission.»
+    </blockquote>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- ۱۰. Repository, Service, Factory Patterns -->
+    <!-- ============================================================ -->
+    <h1 id="sec10">Repository, Service, Factory Patterns</h1>
+
+    <h2>Repository Pattern</h2>
+    <p>Repository مسئولیت ذخیره داده‌ها.</p>
+    <p>مثال:</p>
+    <pre><code>interface UserRepository
+{
+    public function find(int $id): User;
+}
+
+class EloquentUserRepository implements UserRepository
+{
+    public function find(int $id): User
+    {
+        return User::findOrFail($id);
+    }
+}</code></pre>
+    <p>Service:</p>
+    <pre><code>class UserService
+{
+    public function __construct(
+        private UserRepository $users
+    ) {
+    }
+
+    public function getUser(int $id): User
+    {
+        return $this->users->find($id);
+    }
+}</code></pre>
+    <p>Binding:</p>
+    <pre><code>$this->app->bind(
+    UserRepository::class,
+    EloquentUserRepository::class
+);</code></pre>
+    <p>
+      مزایا: DIP, تست‌پذیری, امکان جایگزینی Data Source, جداسازی Persistence
+      Logic
+    </p>
+
+    <h3>سؤال مصاحبه: آیا همیشه Repository لازم است؟</h3>
+    <div class="interview-answer">
+      خیر. اگر فقط Wrapper ساده روی Eloquent باشد: find(), all(), create() –
+      ارزش زیادی ندارد. Repository زمانی مفید است که: Queryهای پیچیده, چند منبع
+      داده, Cache, External API, Domain Logic وجود داشته باشد.
+    </div>
+
+    <h2>Service Layer Pattern</h2>
+    <p>این Pattern در Laravel بسیار رایج است.</p>
+    <p>مشکل – Controller:</p>
+    <pre><code>public function store(Request $request)
+{
+    DB::transaction(function () use ($request) {
+        $order = Order::create(...);
+        Payment::charge(...);
+        Notification::send(...);
+        Log::info(...);
+    });
+}</code></pre>
+    <p>Business Logic داخل Controller است.</p>
+
+    <p>Service Layer:</p>
+    <pre><code>class OrderService
+{
+    public function createOrder(array $data): Order
+    {
+        return DB::transaction(function () use ($data) {
+            $order = Order::create($data);
+            $this->payment->charge($order);
+            $this->notification->send($order);
+            return $order;
+        });
+    }
+}</code></pre>
+    <p>Controller:</p>
+    <pre><code>class OrderController
+{
+    public function store(
+        StoreOrderRequest $request,
+        OrderService $service
+    ) {
+        return $service->createOrder(
+            $request->validated()
+        );
+    }
+}</code></pre>
+    <p>مسئولیت‌ها:</p>
+    <ul>
+      <li>Controller: HTTP, Validation, Response</li>
+      <li>Service: Business Logic, Transaction, Coordination</li>
+      <li>Repository: Database</li>
+    </ul>
+    <p>این تفکیک بسیار مهم است.</p>
+
+    <h3>Repository + Service</h3>
+    <p>بهترین ترکیب:</p>
+    <div class="flow">
+      Controller<br />
+      <span class="arrow">|</span><br />
+      <span class="arrow">↓</span><br />
+      Service<br />
+      <span class="arrow">|</span><br />
+      <span class="arrow">↓</span><br />
+      Repository<br />
+      <span class="arrow">|</span><br />
+      <span class="arrow">↓</span><br />
+      Database
+    </div>
+    <p>Controller به دیتابیس دست نمی‌زند.</p>
+
+    <h2>Factory Pattern</h2>
+    <p>
+      Factory برای ساخت Object استفاده می‌شود. در Laravel دو نوع Factory مهم
+      است.
+    </p>
+    <ul>
+      <li>
+        <strong>Database Factory</strong> – برای Testing و Seeding:
+        <code>User::factory()->count(10)->create();</code>
+      </li>
+      <li><strong>Object Factory</strong> – مثلاً Payment Gateway.</li>
+    </ul>
+    <pre><code>interface PaymentGateway
+{
+    public function pay();
+}
+
+class StripeGateway implements PaymentGateway { public function pay() {} }
+class ZarinpalGateway implements PaymentGateway { public function pay() {} }
+
+class PaymentFactory
+{
+    public function make(string $driver): PaymentGateway
+    {
+        return match ($driver) {
+            'stripe' => new StripeGateway(),
+            'zarinpal' => new ZarinpalGateway(),
+        };
+    }
+}</code></pre>
+    <p>
+      استفاده:
+      <code>$gateway = $factory->make('stripe'); $gateway->pay();</code>
+    </p>
+
+    <h3>Factory vs Service Container</h3>
+    <div class="interview-answer">
+      این سؤال مهم است. Factory: تصمیم می‌گیرد کدام Object ساخته شود. Container:
+      وابستگی‌ها را Resolve می‌کند. Factory معمولاً داخل Service Layer استفاده
+      می‌شود.
+    </div>
+
+    <h2>الگوی پروژه حرفه‌ای Laravel</h2>
+    <p>ساختار:</p>
+    <div class="flow">
+      Http<br />
+      ├── Controllers<br />
+      ├── Requests<br />
+      └── Middleware<br />
+      <br />
+      Services<br />
+      └── OrderService<br />
+      <br />
+      Repositories<br />
+      ├── Contracts<br />
+      └── Eloquent<br />
+      <br />
+      Policies<br />
+      Models
+    </div>
+    <p>این ساختار در شرکت‌ها رایج است.</p>
+
+    <h3>سؤال مصاحبه: Repository و Service چه تفاوتی دارند؟</h3>
+    <div class="interview-answer">
+      Repository مسئول دسترسی به داده است، اما Service مسئول Business Logic و
+      هماهنگی بین چند Repository یا سرویس دیگر است.
+    </div>
+    <p>
+      مثال: Repository: <code>findUser()</code>, <code>saveUser()</code>,
+      <code>getActiveUsers()</code>. Service: <code>registerUser()</code>,
+      <code>purchaseSubscription()</code>, <code>createOrder()</code>.
+    </p>
+
+    <h3>سؤال مهم‌تر: آیا Service می‌تواند چند Repository را استفاده کند؟</h3>
+    <div class="interview-answer">
+      بله.
+      <pre><code>class OrderService
+{
+    public function __construct(
+        private OrderRepository $orders,
+        private ProductRepository $products,
+        private PaymentGateway $gateway
+    ) {
+    }
+}</code></pre>
+    </div>
+
+    <h3>چرا از Service Layer استفاده می‌کنید؟</h3>
+    <div class="interview-answer">
+      برای جدا کردن Business Logic از HTTP Layer. Controller فقط درخواست و پاسخ
+      را مدیریت می‌کند، اما منطق اصلی برنامه، Transactionها، هماهنگی بین
+      Repositoryها، Queue، Notification و سایر عملیات در Service Layer قرار
+      می‌گیرد. این کار باعث رعایت SRP، افزایش تست‌پذیری و Maintainability
+      می‌شود.
+    </div>
+
+    <hr />
+    <p style="text-align: center; color: var(--muted)">
+      پایان مستندات Laravel Internals
+    </p>
+  </body>
+</html>

@@ -1,0 +1,288 @@
+/* ============================================
+   styles.css – استایل‌های مشترک پروژه
+   ============================================ */
+
+/* -------------------- متغیرها -------------------- */
+:root {
+  --bg: #0f1115;
+  --panel: #161922;
+  --text: #e6e8ec;
+  --muted: #9aa3b2;
+  --accent: #7dc4ff;
+  --good: #5fd68c;
+  --bad: #ff7b7b;
+  --border: #2a2f3a;
+  --code-bg: #0b0d12;
+}
+
+/* -------------------- تنظیمات فونت (Vazirmatn) -------------------- */
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('font/Vazirmatn-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+}
+
+/* در صورت نیاز به فایل‌های static (اختیاری):
+@font-face {
+    font-family: 'Vazirmatn';
+    src: url('font/static/Vazirmatn-Regular.ttf') format('truetype');
+    font-weight: normal;
+}
+@font-face {
+    font-family: 'Vazirmatn';
+    src: url('font/static/Vazirmatn-Bold.ttf') format('truetype');
+    font-weight: bold;
+}
+*/
+
+/* -------------------- استایل‌های پایه -------------------- */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  direction: rtl;
+  text-align: right;
+  font-family: "Vazirmatn", "Tahoma", "Segoe UI", sans-serif;
+  line-height: 1.9;
+  font-size: 16px;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+}
+
+h1,
+h2,
+h3 {
+  direction: rtl;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  color: #fff;
+}
+
+h1 {
+  font-size: 1.7em;
+  text-align: center;
+  border: none;
+}
+
+h2 {
+  font-size: 1.35em;
+  margin-top: 2.4em;
+  color: var(--accent);
+}
+
+h3 {
+  font-size: 1.1em;
+  margin-top: 1.6em;
+}
+
+hr {
+  border: none;
+  border-top: 1px dashed var(--border);
+  margin: 2.5em 0;
+}
+
+p {
+  margin: 0.9em 0;
+}
+
+/* -------------------- بلاک‌های کد (LTR) -------------------- */
+pre {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 1em 0;
+  font-family: "Fira Code", "Consolas", monospace;
+  font-size: 0.92em;
+  line-height: 1.6;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  border: none;
+}
+
+/* -------------------- کد اینلاین -------------------- */
+code {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+  background: #1d2230;
+  color: #ffd479;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: "Fira Code", "Consolas", monospace;
+  font-size: 0.9em;
+}
+
+/* -------------------- جدول‌ها -------------------- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2em 0;
+  direction: rtl;
+}
+
+th,
+td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: right;
+  vertical-align: top;
+}
+
+th {
+  background: var(--panel);
+  color: var(--accent);
+}
+
+td.ltr-cell,
+th.ltr-cell {
+  direction: ltr;
+  text-align: left;
+}
+
+/* -------------------- بلاک‌های نقل قول -------------------- */
+blockquote {
+  border-right: 3px solid var(--accent);
+  border-left: none;
+  margin: 1em 0;
+  padding: 0.6em 1em;
+  background: var(--panel);
+  border-radius: 0 6px 6px 0;
+  color: var(--muted);
+}
+
+/* -------------------- جعبه‌های خوب/بد -------------------- */
+.box {
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 1em 0;
+  border: 1px solid var(--border);
+}
+
+.bad {
+  border-color: #5a2a2a;
+  background: #1e1414;
+}
+
+.good {
+  border-color: #234a35;
+  background: #10201a;
+}
+
+.bad h3,
+.good h3 {
+  margin-top: 0;
+  border: none;
+  padding: 0;
+}
+
+.bad h3 {
+  color: var(--bad);
+}
+
+.good h3 {
+  color: var(--good);
+}
+
+/* -------------------- تگ -------------------- */
+.tag {
+  display: inline-block;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 12px;
+  font-size: 0.85em;
+  color: var(--muted);
+  margin-inline-end: 6px;
+}
+
+/* -------------------- پاسخ مصاحبه -------------------- */
+.interview-answer {
+  border-right: 3px solid #b98af1;
+  background: #1a1522;
+  border-radius: 0 6px 6px 0;
+  padding: 12px 16px;
+  margin: 1em 0;
+  color: #dcd3e8;
+}
+
+.interview-answer::before {
+  content: "🗣 پاسخ پیشنهادی مصاحبه";
+  display: block;
+  font-weight: bold;
+  color: #b98af1;
+  margin-bottom: 6px;
+  font-size: 0.85em;
+}
+
+/* -------------------- خط مقایسه -------------------- */
+.comparison-line {
+  font-weight: bold;
+  background: var(--panel);
+  padding: 10px 14px;
+  border-radius: 6px;
+  border-inline-start: 3px solid var(--accent);
+}
+
+/* -------------------- فهرست مطالب (TOC) -------------------- */
+.toc {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+
+.toc ul {
+  margin: 0.3em 0;
+  padding-inline-start: 1.3em;
+}
+
+.toc a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.toc a:hover {
+  text-decoration: underline;
+}
+
+/* ============================================
+   استایل‌های اختصاصی (فقط در برخی فایل‌ها)
+   ============================================ */
+
+/* --- برای فایل Laravel_Internals (فلچارت) --- */
+.flow {
+  direction: ltr;
+  text-align: center;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-family: "Fira Code", monospace;
+  font-size: 0.9em;
+  line-height: 1.8;
+  margin: 1em 0;
+}
+
+.flow .arrow {
+  color: var(--accent);
+}

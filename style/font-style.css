@@ -1,0 +1,20 @@
+@font-face {
+    font-family: 'Vazirmatn';
+    src: url('font/static/Vazirmatn-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Vazirmatn';
+    src: url('font/static/Vazirmatn-Bold.ttf') format('truetype');
+    font-weight: bold;
+    font-style: normal;
+}
+
+
+body {
+    font-family: 'Vazirmatn', sans-serif;
+    font-weight: normal;
+    font-style: normal;
+}

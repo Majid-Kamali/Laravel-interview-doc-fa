@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>راهنمای جامع PHP OOP و SOLID برای مصاحبه</title>
+    <link rel="stylesheet" href="style/styles.css" />
+    <link rel="stylesheet" href="style/font-style.css" />
+  </head>
+  <body>
+    <h1>📘 راهنمای جامع PHP OOP و SOLID برای مصاحبه</h1>
+
+    <div class="toc">
+      <strong>فهرست</strong>
+      <ul>
+        <li><a href="#sec1">بخش ۱: PHP — OOP پایه</a></li>
+        <li><a href="#sec2">بخش ۲: SOLID Principles (کوتاه + کد)</a></li>
+        <li>
+          <a href="#sec3">بخش ۳: اصول SOLID به زبان ساده (توضیح عمیق‌تر)</a>
+        </li>
+      </ul>
+    </div>
+
+    <hr />
+
+    <h1 id="sec0">تعریف</h1>
+    <ul>
+      <li>Consumer یعنی کلاسی که از یک سرویس استفاده می‌کند.</li>
+      <li>
+        Implementation یعنی کلاس واقعی که آن سرویس را پیاده‌سازی کرده است.
+      </li>
+    </ul>
+    <h1 id="sec1">بخش ۱: PHP — OOP پایه</h1>
+
+    <h2>Interface vs Abstract Class</h2>
+    <p>
+      این یکی از پرتکرارترین سوالات مصاحبه‌ست، چون خیلی‌ها تفاوتش رو سطحی بلدن.
+    </p>
+
+    <h3>Interface</h3>
+    <ul>
+      <li>فقط قرارداد (contract) — امضای متدها، بدون implementation</li>
+      <li>
+        یک کلاس می‌تونه چند Interface رو implement کنه (multiple implementation)
+      </li>
+      <li>نمی‌تونه property با مقدار داشته باشه (فقط constant)</li>
+      <li>private , protected را نمی توانیم استفاده کنیم</li>
+      <li>از php 8 به بعد قابلیت استفاده از static رو داریم</li>
+      <li>نمی توان متد public اینترفیس را private در فرزند تعریف کرد</li>
+    </ul>
+    <pre><code>interface PaymentGatewayInterface
+{
+    public function charge(int $amount): bool;
+    public function refund(string $transactionId): bool;
+}</code></pre>
+
+    <h3>Abstract Class</h3>
+    <ul>
+      <li>
+        می‌تونه هم متد abstract (بدون بدنه) و هم متد concrete (با بدنه) داشته
+        باشه
+      </li>
+      <li>
+        یک کلاس فقط می‌تونه از یک Abstract Class extend کنه (single inheritance)
+      </li>
+      <li>می‌تونه property و constructor داشته باشه</li>
+    </ul>
+    <pre><code>abstract class Notification
+{
+    protected string $channel;
+
+    abstract public function send(string $message): void;
+
+    public function log(string $message): void
+    {
+        // این متد مشترک بین همه فرزندهاست
+        Log::info("Sending via {$this->channel}: {$message}");
+    }
+}</code></pre>
+
+    <blockquote>
+      <strong>نکته کلیدی مصاحبه:</strong> سوالی مثل «چرا Interface و نه Abstract
+      Class؟» معمولاً می‌خواد این رو بشنوه: از Interface وقتی استفاده می‌کنیم که
+      چند کلاس بی‌ربط به هم (از نظر سلسله‌مراتب) باید یک رفتار مشترک رو
+      implement کنن — مثلاً <code>StripeGateway</code> و
+      <code>ZarinpalGateway</code> هیچ ارتباط والد-فرزندی ندارن، فقط قرار
+      قراردادی مشترک دارن.
+    </blockquote>
+
+    <h3>مثال عملی</h3>
+    <p>فرض کنیم سیستم پرداخت داریم:</p>
+    <pre><code>interface PaymentGateway
+{
+    public function pay(int $amount): bool;
+}</code></pre>
+
+    <p>دو پیاده‌سازی:</p>
+    <pre><code>class StripeGateway implements PaymentGateway
+{
+    public function pay(int $amount): bool
+    {
+        return true;
+    }
+}
+
+class ZarinpalGateway implements PaymentGateway
+{
+    public function pay(int $amount): bool
+    {
+        return true;
+    }
+}</code></pre>
+
+    <p>و Service:</p>
+    <pre><code>class OrderService
+{
+    public function __construct(private PaymentGateway $gateway)
+    {
+    }
+}</code></pre>
+
+    <p>در Laravel:</p>
+    <pre><code>$this->app->bind(PaymentGateway::class, StripeGateway::class);</code></pre>
+
+    <h3>تفاوت اصلی در یک جمله</h3>
+    <div class="comparison-line">
+      Interface برای تعریف قابلیت‌ها (capabilities) است، Abstract Class برای
+      اشتراک رفتار (shared behavior).
+    </div>
+
+    <div class="interview-answer">
+      در Laravel معمولاً Interface را ترجیح می‌دهم چون Service Container روی
+      Interface Binding کار می‌کند، تست کردن با Mock بسیار ساده‌تر می‌شود،
+      کلاس‌ها به Implementation وابسته نیستند و می‌توانم بدون تغییر Consumer،
+      پیاده‌سازی را جایگزین کنم. Abstract Class را فقط زمانی استفاده می‌کنم که
+      واقعاً منطق مشترک قابل توجهی بین کلاس‌ها وجود داشته باشد.
+    </div>
+
+    <h3>سوال رایج</h3>
+    <p><strong>می‌تونیم توی interface ها از protected استفاده کنیم؟</strong></p>
+    <p>
+      خیر، در PHP نمی‌توانیم در Interface از <code>protected</code> یا
+      <code>private</code> استفاده کنیم.
+    </p>
+
+    <hr />
+
+    <h2>Trait</h2>
+    <p>
+      راه‌حل PHP برای "multiple inheritance" (چون PHP از ارث‌بری چندگانه کلاس
+      پشتیبانی نمی‌کنه):
+    </p>
+    <pre><code>trait Loggable
+{
+    public function logActivity(string $action): void
+    {
+        Log::info(static::class . ": {$action}");
+    }
+}
+
+class Order
+{
+    use Loggable;
+}</code></pre>
+    <blockquote>
+      <strong>نکته مهم:</strong> اگه دو Trait متد هم‌نام داشته باشن و هر دو
+      <code>use</code> بشن، تضاد پیش می‌آد و باید با <code>insteadof</code> حلش
+      کنی — این یه سوال ریز ولی رایجه.
+    </blockquote>
+
+    <hr />
+
+    <h2>Namespace و Composer Autoload</h2>
+
+    <h3>۱. Namespace چیست؟</h3>
+    <p>
+      در PHP وقتی پروژه بزرگ می‌شود، احتمال دارد دو کلاس با یک نام داشته باشیم.
+    </p>
+    <p>
+      در یک پروژه: <code>App\Models\User</code> و <code>Package\Auth\User</code>
+    </p>
+    <p>هر دو اسمشان User است و PHP نمی‌داند کدام را استفاده کند.</p>
+    <p>
+      <strong
+        >Namespace برای جلوگیری از تداخل نام کلاس‌ها و سازمان‌دهی کد ساخته شده
+        است.</strong
+      >
+    </p>
+
+    <h3>۲. Composer Autoload چیست؟</h3>
+    <p>اگر کلاس را import کردیم:</p>
+    <pre><code>use App\Models\User;</code></pre>
+    <p>
+      PHP از کجا بفهمد فایل <code>User.php</code> کجاست؟ اینجا Composer وارد
+      می‌شود.
+    </p>
+    <p>
+      Composer یک سیستم Autoload دارد که مشخص می‌کند کلاس
+      <code>App\Models\User</code> در کدام فایل قرار دارد.
+    </p>
+
+    <h3>PSR-4 Autoloading</h3>
+    <p>
+      Laravel از استاندارد <strong>PSR-4</strong> استفاده می‌کند. در فایل
+      <code>composer.json</code> می‌بینیم:
+    </p>
+    <pre><code>{
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/"
+        }
+    }
+}</code></pre>
+    <p>
+      <strong>معنی:</strong> هر کلاسی که با <code>App\</code> شروع شود، داخل
+      پوشه <code>app/</code> جستجو شود.
+    </p>
+
+    <h3>Autoload چگونه اجرا می‌شود؟</h3>
+    <p>
+      وقتی Laravel شروع می‌شود، فایل <code>public/index.php</code> را اجرا
+      می‌کند. یکی از اولین کارها:
+    </p>
+    <pre><code>require __DIR__.'/../vendor/autoload.php';</code></pre>
+    <p>
+      این فایل توسط Composer ساخته شده. بعد از آن PHP می‌تواند کلاس‌ها را خودکار
+      پیدا کند.
+    </p>
+
+    <h3><code>composer dump-autoload</code> چیست؟</h3>
+    <p>
+      وقتی کلاس جدید اضافه می‌کنی (مثلاً
+      <code>app/Services/PaymentService.php</code>)، گاهی Composer هنوز آن را
+      نمی‌شناسد. اجرا می‌کنیم:
+    </p>
+    <pre><code>composer dump-autoload</code></pre>
+    <p>Composer دوباره Mapping کلاس‌ها را تولید می‌کند. در Laravel معمولاً:</p>
+    <pre><code>composer dump-autoload -o</code></pre>
+    <p>یعنی <strong>Optimized Autoload</strong> — برای Production بهتر است.</p>
+
+    <h3>تفاوت include/require با Autoload</h3>
+    <table>
+      <tr>
+        <th>روش</th>
+        <th>مشکل</th>
+      </tr>
+      <tr>
+        <td class="ltr-cell"><code>require 'PaymentService.php';</code></td>
+        <td>مدیریت فایل‌ها سخت، وابستگی زیاد، مناسب پروژه بزرگ نیست</td>
+      </tr>
+      <tr>
+        <td class="ltr-cell">Autoload</td>
+        <td>
+          <code>$service = new PaymentService();</code> — خودکار لود می‌شود
+        </td>
+      </tr>
+    </table>
+
+    <h3>Namespace و Autoload چه ارتباطی دارند؟</h3>
+    <blockquote>
+      Namespace نام کامل کلاس را مشخص می‌کند، اما Autoload مشخص می‌کند این کلاس
+      در کدام فایل قرار دارد. Composer با استفاده از Namespace و PSR-4 Mapping
+      فایل کلاس را پیدا و Load می‌کند.
+    </blockquote>
+
+    <div class="interview-answer">
+      Namespace در PHP برای سازمان‌دهی کلاس‌ها و جلوگیری از collision استفاده
+      می‌شود و Composer Autoload وظیفه بارگذاری خودکار این کلاس‌ها را دارد.
+      Laravel از PSR-4 autoloading استفاده می‌کند؛ در composer.json یک mapping
+      بین namespace و directory تعریف می‌شود. هنگام اجرای برنامه،
+      vendor/autoload.php بارگذاری می‌شود و Composer بر اساس namespace کلاس
+      موردنظر را پیدا می‌کند، بنابراین دیگر نیازی به require کردن دستی فایل‌ها
+      نداریم.
+    </div>
+
+    <hr />
+
+    <h2>Exceptions</h2>
+
+    <h3>Hierarchy</h3>
+    <pre><code>Throwable
+│
+├── Exception
+│   │
+│   ├── RuntimeException
+│   ├── LogicException
+│   ├── InvalidArgumentException
+│   ├── PDOException
+│   └── ...
+│
+└── Error
+    │
+    ├── TypeError
+    ├── ParseError
+    ├── FatalError
+    ├── ArgumentCountError
+    └── ...</code></pre>
+
+    <h3>Throwable چیست؟</h3>
+    <p>
+      از PHP 7 به بعد یک Interface اصلی داریم: <strong>Throwable</strong>. این
+      بالاترین سطح برای چیزهایی است که می‌توان با <code>catch</code> گرفت.
+    </p>
+    <pre><code>catch (Throwable $e)</code></pre>
+    <p>
+      می‌تواند هم <code>Exception</code> و هم <code>Error</code> را دریافت کند.
+    </p>
+
+    <h3>تفاوت Exception و Error</h3>
+    <table>
+      <tr>
+        <th>نوع</th>
+        <th>توضیح</th>
+        <th>مثال</th>
+      </tr>
+      <tr>
+        <td><strong>Exception</strong></td>
+        <td>
+          معمولاً مشکل منطقی یا شرایط غیرمنتظره‌ی برنامه است. قابل پیش‌بینی است.
+        </td>
+        <td class="ltr-cell">
+          <code>throw new Exception("Payment failed")</code>
+        </td>
+      </tr>
+      <tr>
+        <td><strong>Error</strong></td>
+        <td>معمولاً مشکل در خود کد یا موتور PHP است.</td>
+        <td class="ltr-cell">
+          <code>TypeError</code> — وقتی int انتظار داریم ولی string گرفتیم
+        </td>
+      </tr>
+    </table>
+
+    <pre><code>function add(int $a)
+{
+    return $a;
+}
+
+add("hello"); // TypeError</code></pre>
+
+    <blockquote>
+      Laravel تقریباً تمام خطاها را از طریق Exception Handler مدیریت می‌کند.
+    </blockquote>
+
+    <h3>Custom Exception در Laravel</h3>
+    <pre><code>class PaymentFailedException extends Exception
+{
+}</code></pre>
+    <p>استفاده:</p>
+    <pre><code>if (!$paymentSuccessful) {
+    throw new PaymentFailedException("Payment failed");
+}</code></pre>
+    <p>بعد در Handler:</p>
+    <pre><code>public function render($request, Throwable $exception)
+{
+    if ($exception instanceof PaymentFailedException) {
+        return response()->json([
+            'message' => $exception->getMessage()
+        ], 400);
+    }
+}</code></pre>
+
+    <div class="interview-answer">
+      در PHP هر چیزی که قابلیت throw شدن و catch شدن داشته باشد زیرمجموعه
+      Throwable است. Exceptionها معمولاً خطاهای قابل مدیریت در منطق برنامه
+      هستند، مثل Validation یا خطای پرداخت. Errorها بیشتر مربوط به مشکلات سطح
+      زبان PHP هستند، مثل TypeError یا ParseError. در Laravel معمولاً
+      Exceptionها را مدیریت می‌کنیم، اما برای جلوگیری از crashهای غیرمنتظره
+      می‌توانیم Throwable را در سطح بالاتر catch کنیم.
+    </div>
+
+    <hr />
+
+    <h2>Type Hinting / Union Types / Enums</h2>
+
+    <h3>Union Type (PHP 8+)</h3>
+    <pre><code>function process(int|string $id): void {}</code></pre>
+
+    <h3>Enum (PHP 8.1+)</h3>
+    <pre><code>enum PaymentStatus: string
+{
+    case Pending = 'pending';
+    case Success = 'success';
+    case Failed = 'failed';
+}</code></pre>
+    <blockquote>
+      <strong>سوال رایج مصاحبه:</strong> تفاوت Pure Enum و Backed Enum — Backed
+      Enum مقدار اسکالر (مثل رشته یا int) داره و می‌تونی از
+      <code>PaymentStatus::from('pending')</code> استفاده کنی؛ Pure Enum فقط
+      case داره بدون مقدار.
+    </blockquote>
+
+    <hr />
+
+    <h2>Closures</h2>
+    <pre><code>$multiplier = function (int $x) use ($factor) {
+    return $x * $factor;
+};
+
+// Arrow function (PHP 7.4+) — use خودکاره
+$multiplier = fn($x) => $x * $factor;</code></pre>
+
+    <h3>Closure چیست؟</h3>
+    <p>
+      یک تابع بدون نام (Anonymous Function) که می‌تواند به عنوان یک متغیر ذخیره
+      شود، به تابع دیگری ارسال شود یا حتی متغیرهای محیط بیرونی خودش را به خاطر
+      بسپارد.
+    </p>
+    <p>نام ندارد و فقط از طریق متغیر قابل دسترسی است.</p>
+
+    <h3>استفاده از Closure در Laravel</h3>
+    <ul>
+      <li>Route</li>
+      <li>Collection</li>
+      <li>Middleware</li>
+      <li>Database Transaction</li>
+    </ul>
+    <pre><code>DB::transaction(function () {
+    Order::create([
+        'user_id' => 1
+    ]);
+});</code></pre>
+
+    <h3>Capture by Value vs Reference</h3>
+    <p>مقدار را هنگام ساخت Closure کپی می‌کند:</p>
+    <pre><code>$count = 10;
+
+$closure = function () use ($count) {
+    return $count;
+};
+
+$count = 20;
+
+echo $closure(); // 10</code></pre>
+
+    <p>اگر بخواهیم مقدار اصلی تغییر کند (با Reference):</p>
+    <pre><code>$count = 10;
+
+$closure = function () use (&$count) {
+    $count++;
+};
+
+$closure();
+
+echo $count; // 11</code></pre>
+    <blockquote><code>&amp;</code> یعنی با Reference بگیر.</blockquote>
+
+    <div class="interview-answer">
+      Closure یک anonymous function در PHP است که می‌تواند به عنوان callback
+      استفاده شود و قابلیت capture کردن متغیرهای محیط بیرونی را دارد. در Laravel
+      به صورت گسترده در Route definitions، Collections، Database Transactions،
+      Middleware و Event handling استفاده می‌شود. مزیت آن این است که می‌توانیم
+      رفتار را به صورت داینامیک به بخش‌های مختلف برنامه ارسال کنیم.
+    </div>
+
+    <hr />
+
+    <h2>Pure Enum vs Backed Enum</h2>
+
+    <h3>Pure Enum چیست؟</h3>
+    <p>Pure Enum فقط شامل case است و هیچ مقداری ندارد.</p>
+    <pre><code>enum PaymentStatus
+{
+    case Pending;
+    case Paid;
+    case Failed;
+}</code></pre>
+    <p>استفاده:</p>
+    <pre><code>$status = PaymentStatus::Paid;</code></pre>
+
+    <h3>Backed Enum چیست؟</h3>
+    <p>
+      Backed Enum علاوه بر case، یک مقدار واقعی دارد. این مقدار باید یکی از این
+      دو باشد: <code>string</code> یا <code>int</code>
+    </p>
+    <pre><code>enum PaymentStatus: string
+{
+    case Pending = 'pending';
+    case Paid = 'paid';
+    case Failed = 'failed';
+}</code></pre>
+    <p>حالا:</p>
+    <pre><code>$status = PaymentStatus::Paid;
+echo $status->value; // "paid"</code></pre>
+
+    <h3>چرا در Laravel از Backed Enum بیشتر استفاده می‌کنیم؟</h3>
+    <div class="interview-answer">
+      در پروژه‌های Laravel معمولاً از Backed Enum استفاده می‌کنم چون مقادیر آن
+      قابل ذخیره در Database هستند و با Eloquent Casting به صورت type-safe کار
+      می‌کنند. این باعث می‌شود از مقدارهای اشتباه جلوگیری شود و کد خواناتر و
+      قابل نگهداری‌تر باشد.
+    </div>
+
+    <h3>Pure Enum چه زمانی استفاده می‌شود؟</h3>
+    <p>مثلاً وقتی فقط مفهوم مهم است، نه مقدار:</p>
+    <pre><code>enum UserRole
+{
+    case Admin;
+    case Customer;
+    case Guest;
+}</code></pre>
+
+    <div class="interview-answer">
+      Pure Enum فقط شامل caseها است و هیچ مقدار scalar ندارد، بنابراین برای
+      زمانی مناسب است که فقط یک مجموعه ثابت از حالت‌ها می‌خواهیم. اما Backed
+      Enum علاوه بر case دارای مقدار string یا int است و برای سناریوهایی مثل
+      ذخیره در Database مناسب‌تر است. در Laravel معمولاً Backed Enum استفاده
+      می‌کنم چون با Eloquent Casts می‌توانیم مقدارهای Database را به Enum تبدیل
+      کنیم و از type safety استفاده کنیم.
+    </div>
+
+    <hr />
+
+    <h1 id="sec2">بخش ۲: SOLID Principles</h1>
+    <p>
+      این پنج اصل جزو پرتکرارترین سوالات مصاحبه‌ی بک‌اند هستن — نه فقط تعریف،
+      بلکه انتظار دارن با مثال کد واقعی از پروژه Laravel توضیح بدی.
+    </p>
+
+    <h2>S — Single Responsibility Principle (SRP)</h2>
+    <p>هر کلاس فقط باید یک دلیل برای تغییر داشته باشه.</p>
+
+    <div class="box bad">
+      <h3>❌ نقض SRP</h3>
+      <pre><code>class Order
+{
+    public function calculateTotal(): float { /* ... */ }
+    public function saveToDatabase(): void { /* ... */ }
+    public function sendConfirmationEmail(): void { /* ... */ }
+}</code></pre>
+      <p>
+        این کلاس هم منطق محاسبه، هم persistence، هم notification رو داره — سه
+        دلیل مختلف برای تغییر.
+      </p>
+    </div>
+
+    <div class="box good">
+      <h3>✅ رعایت SRP</h3>
+      <pre><code>class Order { /* فقط منطق دامنه سفارش */ }
+
+class OrderRepository
+{
+    public function save(Order $order): void {}
+}
+
+class OrderConfirmationNotifier
+{
+    public function notify(Order $order): void {}
+}</code></pre>
+    </div>
+
+    <h2>O — Open/Closed Principle (OCP)</h2>
+    <p>کلاس باید برای extension باز و برای modification بسته باشه.</p>
+
+    <div class="box bad">
+      <h3>❌ نقض OCP</h3>
+      <pre><code>class PaymentProcessor
+{
+    public function process(string $type, float $amount)
+    {
+        if ($type === 'stripe') { /* ... */ }
+        elseif ($type === 'paypal') { /* ... */ }
+        // هر gateway جدید یعنی دوباره این کلاس رو تغییر بدی
+    }
+}</code></pre>
+    </div>
+
+    <div class="box good">
+      <h3>✅ رعایت OCP (با Interface)</h3>
+      <pre><code>interface PaymentGatewayInterface
+{
+    public function process(float $amount): bool;
+}
+
+class StripeGateway implements PaymentGatewayInterface { /* ... */ }
+class PaypalGateway implements PaymentGatewayInterface { /* ... */ }
+
+class PaymentProcessor
+{
+    public function __construct(private PaymentGatewayInterface $gateway) {}
+
+    public function process(float $amount): bool
+    {
+        return $this->gateway->process($amount);
+    }
+}</code></pre>
+      <p>
+        حالا برای gateway جدید فقط یک کلاس جدید اضافه می‌کنی،
+        <code>PaymentProcessor</code> رو دست نمی‌زنی.
+      </p>
+    </div>
+
+    <h2>L — Liskov Substitution Principle (LSP)</h2>
+    <p>فرزند باید بتونه بدون تغییر رفتار مورد انتظار، جای والدش بنشیند.</p>
+
+    <div class="box bad">
+      <h3>❌ نقض LSP (مثال کلاسیک)</h3>
+      <pre><code>class Rectangle
+{
+    protected float $width;
+    protected float $height;
+
+    public function setWidth(float $w): void { $this->width = $w; }
+    public function setHeight(float $h): void { $this->height = $h; }
+    public function area(): float { return $this->width * $this->height; }
+}
+
+class Square extends Rectangle
+{
+    public function setWidth(float $w): void
+    {
+        $this->width = $this->height = $w; // رفتار غیرمنتظره!
+    }
+}</code></pre>
+      <p>
+        اگه کدی <code>Rectangle $shape</code> بگیره و انتظار داشته باشه
+        <code>setWidth(5); setHeight(10);</code> بده <code>area() == 50</code>،
+        ولی <code>Square</code> بجاش بده، رفتار غلط می‌شه.
+      </p>
+    </div>
+
+    <h2>I — Interface Segregation Principle (ISP)</h2>
+    <p>کلاس‌ها نباید مجبور شن متدهایی رو implement کنن که به کارشون نمی‌آد.</p>
+
+    <div class="box bad">
+      <h3>❌ نقض ISP</h3>
+      <pre><code>interface Worker
+{
+    public function work(): void;
+    public function eat(): void;
+}
+
+class RobotWorker implements Worker
+{
+    public function work(): void { /* ... */ }
+    public function eat(): void { throw new Exception('Robots do not eat!'); } // مجبور شده implement کنه
+}</code></pre>
+    </div>
+
+    <div class="box good">
+      <h3>✅ رعایت ISP</h3>
+      <pre><code>interface Workable { public function work(): void; }
+interface Eatable { public function eat(): void; }
+
+class HumanWorker implements Workable, Eatable {}
+class RobotWorker implements Workable {}</code></pre>
+    </div>
+
+    <h2>D — Dependency Inversion Principle (DIP)</h2>
+    <p>
+      ماژول‌های سطح بالا نباید به ماژول‌های سطح پایین مستقیم وابسته باشن؛ هر دو
+      باید به abstraction وابسته باشن.
+    </p>
+    <blockquote>
+      این دقیقاً همون مثال <code>PaymentProcessor</code> بالاست —
+      <code>PaymentProcessor</code> (سطح بالا) به
+      <code>PaymentGatewayInterface</code> (abstraction) وابسته‌ست، نه به
+      <code>StripeGateway</code> مستقیم (سطح پایین). این اصل پایه‌ی کل Service
+      Container لاراول هست.
+    </blockquote>
+
+    <hr />
+
+    <h1 id="sec3">بخش ۳: اصول SOLID به زبان ساده (توضیح عمیق‌تر)</h1>
+
+    <h2>۱. اصل تک مسئولیتی (Single Responsibility Principle)</h2>
+    <p>
+      هر کلاسی که توی برنامه‌ی ما وجود داره، باید یک مسئولیت خاص و مشخص داشته.
+      در واقع این کلاس باید فقط و فقط مسئول یک عملکرد توی برنامه باشه.
+    </p>
+
+    <h3>مثال نقض SRP</h3>
+    <pre><code>class User {
+    public function information() {}
+    public function sendEmail() {}
+    public function orders() {}
+}</code></pre>
+    <p>
+      توی این کلاس ما سه تا متد داریم. متد <code>information</code> که اطلاعات
+      کاربر رو برمیگردونه. متد <code>sendMail</code> برای ارسال ایمیل به کاربر و
+      متد <code>orders</code> سفارش‌های کاربر رو برمی‌گردونه.
+    </p>
+    <p>
+      کلاس <code>User</code> نباید مسئول ارسال ایمیل و یا هندل کردن سفارشات
+      کاربر باشه. در این صورت کلاس ما با عملکردهای ذاتی خودش محصور شده نیست.
+      یعنی کلاس User با یک سری عملکردهای غیرمرتبط آمیخته شده.
+    </p>
+    <p>
+      این مسئله زمانی مشکل‌ساز میشه که می‌خوایم کلاس رو گسترش بدیم. مثلاً
+      ایمیل‌های مختلف و اختصاصی‌تر بفرستیم. که آخر کار نمی‌دونیم این کلاس User
+      هست یا Email!
+    </p>
+
+    <h3>راه حل</h3>
+    <pre><code>class User {
+    public function information() {}
+}
+
+class Email {
+    public function send(User $user) {}
+}
+
+class Order {
+    public function show(User $user) {}
+}</code></pre>
+    <p>
+      همونطور که می‌بینید، کلاس User ما خلوت‌تر، تمیزتر و مرتب تر شد. همچنین
+      توسعه این کلاس و کلاس‌های دیگه راحت‌تر انجام میشه.
+    </p>
+
+    <blockquote>
+      <strong>نکته:</strong> این اصل نه تنها توی سطح کلاس‌ها، بلکه توی سطح متدها
+      و توابع هم می‌تونه اعمال بشه.
+    </blockquote>
+
+    <h3>مثال نقض SRP در سطح متد</h3>
+    <pre><code>class Mailer {
+    public function send($text) {
+        $mailer = new Mail();
+        $mailer->login();
+        $mailer->send($text);
+    }
+}</code></pre>
+    <p>
+      متد <code>send</code> مسئول انجام ۲ کار هست: احراز هویت و بعد ارسال ایمیل.
+      همچنین اصل دوم SOLID (OCP) هم اینجا نقض شده.
+    </p>
+
+    <h3>راه حل</h3>
+    <pre><code>class Mailer {
+    private $mailer;
+
+    public function __construct($mailer) {
+        $this->mailer = $mailer;
+    }
+
+    public function send($text) {
+        $this->mailer->send($text);
+    }
+}
+
+$myEmail = new MyEmailService();
+$myEmail->login();
+
+$mail = new Mailer($myEmail);
+$mail->send('Salut');</code></pre>
+    <p>
+      همونطور که می‌بینیم، متد <code>send</code> فقط کاری رو انجام میده که
+      وظیفه‌ اون هست.
+    </p>
+
+    <hr />
+
+    <h2>۲. اصل باز - بسته (Open/Closed Principle)</h2>
+    <p>
+      موجودیت‌های یک نرم‌افزار (کلاس‌ها، ماژول‌ها، توابع و ...) باید برای توسعه
+      داده شدن، باز و برای تغییر دادن، بسته باشن.
+    </p>
+    <p>
+      اصل OCP میگه که ما باید کد رو جوری بنویسیم که وقتی می‌خوایم اون رو توسعه
+      بدیم و ویژگی‌های جدید اضافه کنیم، مجبور نشیم اون رو تغییر بدیم و دستکاری
+      کنیم. ویژگی‌های جدید باید براحتی و بدون دستکاری کردن قسمت‌های دیگه اضافه
+      بشن.
+    </p>
+    <blockquote>
+      شما باید بتوانید قابلیت جدیدی به سیستم اضافه کنید، بدون اینکه حتی یک خط از
+      کدهای قدیمی و تست‌شده را دستکاری کنید.
+    </blockquote>
+
+    <h3>تفکیک مفهوم "باز" و "بسته"</h3>
+    <ul>
+      <li>
+        <strong>باز برای گسترش (Open for Extension):</strong> یعنی باید طوری
+        طراحی کنید که با اضافه شدن نیازمندی جدید، به جای ویرایش کلاس اصلی، یک
+        کلاس جدید بنویسید و آن را به سیستم وصل کنید (مثلاً از طریق اینترفیس یا
+        وراثت).
+      </li>
+      <li>
+        <strong>بسته برای تغییر (Closed for Modification):</strong> یعنی وقتی یک
+        کلاس نوشته شد، دیباگ شد و در محیط پروداکشن قرار گرفت، نباید دوباره داخل
+        آن بروید و کدهای آن را تغییر دهید. چون هر تغییری در کد قدیمی، ریسک ایجاد
+        باگ جدید در بخش‌هایی که قبلاً کار می‌کردند را به همراه دارد.
+      </li>
+    </ul>
+
+    <div class="box bad">
+      <h3>❌ حالت نقض (بد) — با شرط if/else</h3>
+      <pre><code>// کلاسی که نوع شکل را با یک پراپرتی مشخص می‌کند (طراحی ضعیف)
+class BadShape
+{
+    public string $type;
+    public ?float $side = null;   // برای مربع
+    public ?float $radius = null; // برای دایره
+}
+
+class BadAreaCalculator
+{
+    public function calculate(BadShape $shape): float
+    {
+        if ($shape->type === 'square') {
+            return $shape->side ** 2;
+        } elseif ($shape->type === 'circle') {
+            return 3.14 * ($shape->radius ** 2);
+        }
+        // اگر فردا بخواهیم شکل "مثلث" اضافه کنیم، باید این متد را ویرایش کنیم!
+        throw new Exception("Shape type not supported");
+    }
+}
+
+// استفاده
+$square = new BadShape();
+$square->type = 'square';
+$square->side = 5;
+
+$calculator = new BadAreaCalculator();
+echo $calculator->calculate($square); // خروجی: 25</code></pre>
+    </div>
+
+    <div class="box good">
+      <h3>✅ حالت صحیح (خوب) — با استفاده از اینترفیس</h3>
+      <pre><code>// 1. یک اینترفیس (قرارداد) تعریف می‌کنیم
+interface Shape
+{
+    public function area(): float;
+}
+
+// 2. هر شکل، کلاس مجزای خودش را دارد که اینترفیس را پیاده‌سازی می‌کند
+class Square implements Shape
+{
+    public function __construct(private float $side) {}
+
+    public function area(): float
+    {
+        return $this->side ** 2;
+    }
+}
+
+class Circle implements Shape
+{
+    public function __construct(private float $radius) {}
+
+    public function area(): float
+    {
+        return pi() * ($this->radius ** 2);
+    }
+}
+
+// 3. کلاس محاسبه‌گر دیگر هیچ چیزی از جزئیات اشکال نمی‌داند
+class AreaCalculator
+{
+    // ورودی از نوع اینترفیس است، نه یک کلاس مشخص
+    public function calculate(Shape $shape): float
+    {
+        return $shape->area();
+    }
+}
+
+// --- استفاده از کد ---
+$square = new Square(5);
+$circle = new Circle(3);
+
+$calculator = new AreaCalculator();
+
+echo $calculator->calculate($square); // خروجی: 25
+echo $calculator->calculate($circle); // خروجی: 28.27</code></pre>
+    </div>
+
+    <hr />
+
+    <h2>۳. اصل جایگزینی لیسکوف (Liskov Substitution Principle)</h2>
+    <p>
+      اگر S یک زیر کلاس T باشه، آبجکت‌های نوع T باید بتونن بدون تغییر دادن کد
+      برنامه، با آبجکت‌های نوع S جایگزین بشن.
+    </p>
+    <p>
+      <strong>به بیان ساده‌تر:</strong> کلاس‌های فرزند نباید رفتار و ویژگی‌های
+      کلاس والد رو تغییر بدن.
+    </p>
+    <blockquote>
+      یعنی اگر جایی از برنامه از کلاس والد استفاده می‌کنیم، بتوانیم کلاس فرزند
+      را جای آن قرار دهیم بدون اینکه رفتار برنامه خراب شود.
+    </blockquote>
+
+    <h3>مثال ساده</h3>
+    <pre><code>class Bird
+{
+    public function fly(): void
+    {
+        echo "Flying";
+    }
+}
+
+class Sparrow extends Bird
+{
+}
+
+function makeBirdFly(Bird $bird)
+{
+    $bird->fly();
+}
+
+makeBirdFly(new Sparrow()); // هیچ مشکلی ندارد</code></pre>
+
+    <h3>توضیح</h3>
+    <p>
+      LSP می‌گوید هر کلاس فرزند باید بتواند بدون تغییر رفتار صحیح برنامه جایگزین
+      کلاس والد شود. اگر استفاده از کلاس فرزند باعث شود کدهای وابسته به والد
+      خراب شوند، Exception غیرمنتظره ایجاد شود یا قرارداد رفتاری تغییر کند، این
+      اصل نقض شده است.
+    </p>
+    <blockquote>
+      در Laravel این موضوع را معمولاً در Interfaceها، Repositoryها، Serviceها و
+      Strategy Pattern رعایت می‌کنیم.
+    </blockquote>
+
+    <hr />
+
+    <h2>۴. اصل جداسازی اینترفیس‌ها (Interface Segregation Principle)</h2>
+    <p>
+      کلاس‌ها نباید مجبور باشن متدهایی رو implement کنن که به کارشون نمی‌آد.
+    </p>
+    <blockquote>
+      <strong
+        >هیچ کلاسی نباید مجبور شود متدهایی را پیاده‌سازی کند که به آن‌ها نیاز
+        ندارد.</strong
+      >
+    </blockquote>
+    <p>یعنی Interface باید کوچک، متمرکز و تخصصی باشد.</p>
+
+    <h3>مثال</h3>
+    <pre><code>interface Workable
+{
+    public function work(): void;
+}
+
+interface Eatable
+{
+    public function eat(): void;
+}
+
+class HumanWorker implements Workable, Eatable
+{
+    public function work(): void
+    {
+        echo "Working";
+    }
+
+    public function eat(): void
+    {
+        echo "Eating";
+    }
+}
+
+class RobotWorker implements Workable
+{
+    public function work(): void
+    {
+        echo "Working";
+    }
+}</code></pre>
+
+    <h3>چرا Interface کوچک بهتر است؟</h3>
+    <p>
+      چون باعث <strong>کاهش Coupling</strong>، <strong>افزایش Cohesion</strong>،
+      <strong>تست‌پذیری بهتر</strong> و <strong>تغییرات کمتر</strong> در سیستم
+      می‌شود.
+    </p>
+
+    <h3>تفاوت ISP با SRP</h3>
+    <table>
+      <tr>
+        <th>اصل</th>
+        <th>تمرکز</th>
+      </tr>
+      <tr>
+        <td><strong>SRP</strong></td>
+        <td>هر کلاس یک مسئولیت داشته باشد.</td>
+      </tr>
+      <tr>
+        <td><strong>ISP</strong></td>
+        <td>هر Interface فقط قرارداد مربوط به یک مسئولیت را تعریف کند.</td>
+      </tr>
+    </table>
+
+    <h3>توضیح</h3>
+    <p>
+      ISP می‌گوید Interfaceها باید کوچک و متمرکز باشند و هیچ کلاسی نباید مجبور
+      شود متدهایی را پیاده‌سازی کند که از آن‌ها استفاده نمی‌کند. در Laravel
+      معمولاً به جای Interfaceهای بزرگ، Interfaceهای تخصصی مثل
+      <code>Reader</code>، <code>Writer</code> یا
+      <code>PaymentGateway</code> تعریف می‌کنیم تا وابستگی‌ها کاهش پیدا کند،
+      تست‌ها ساده‌تر شوند و تغییرات سیستم روی بخش‌های غیرمرتبط اثر نگذارد.
+    </p>
+
+    <hr />
+
+    <h2>۵. اصل وارونگی وابستگی (Dependency Inversion Principle)</h2>
+    <p>
+      کلاس‌های سطح بالا نباید به کلاس‌های سطح پایین وابسته باشن؛ هر دو باید
+      وابسته به انتزاع (Abstractions) باشن. موارد انتزاعی نباید وابسته به جزییات
+      باشن. جزییات باید وابسته به انتزاع باشن.
+    </p>
+    <blockquote>
+      <strong
+        >ماژول‌های سطح بالا نباید به ماژول‌های سطح پایین وابسته باشند؛ هر دو
+        باید به Abstraction (Interface) وابسته باشند.</strong
+      ><br />
+      همچنین:
+      <strong
+        >Abstraction نباید به Details وابسته باشد؛ Details باید به Abstraction
+        وابسته باشند.</strong
+      >
+    </blockquote>
+    <p>
+      به جای اینکه کلاس‌ها مستقیماً به کلاس‌های دیگر وابسته باشند، باید به
+      Interface یا Contract وابسته باشند.
+    </p>
+
+    <h3>مثال</h3>
+    <p>ابتدا Interface تعریف می‌کنیم:</p>
+    <pre><code>interface NotificationService
+{
+    public function send(string $message): void;
+}</code></pre>
+    <p>پیاده‌سازی:</p>
+    <pre><code>class EmailService implements NotificationService
+{
+    public function send(string $message): void
+    {
+        echo "Email sent: {$message}";
+    }
+}</code></pre>
+    <p>OrderService:</p>
+    <pre><code>class OrderService
+{
+    public function __construct(
+        private NotificationService $notification
+    ) {
+    }
+
+    public function createOrder()
+    {
+        $this->notification->send("Order created");
+    }
+}</code></pre>
+    <p>الان OrderService فقط Interface را می‌شناسد.</p>
+
+    <h3>Laravel چگونه این را حل می‌کند؟</h3>
+    <p>از طریق <strong>Service Container</strong>. در Service Provider:</p>
+    <pre><code>$this->app->bind(NotificationService::class, EmailService::class);</code></pre>
+    <p>Controller یا Service:</p>
+    <pre><code>class OrderController extends Controller
+{
+    public function __construct(private OrderService $orderService) {}
+}</code></pre>
+
+    <h3>چرا از Interface استفاده می‌کنیم؟</h3>
+    <p>
+      برای اجرای <strong>Dependency Inversion Principle</strong>. ماژول سطح بالا
+      نباید به جزئیات وابسته باشد. با استفاده از Interface و Service Container
+      می‌توانیم پیاده‌سازی را تغییر دهیم، تست بنویسیم و سیستم را توسعه‌پذیر
+      کنیم.
+    </p>
+
+    <h3>توضیح</h3>
+    <p>
+      DIP می‌گوید کلاس‌های سطح بالا نباید به کلاس‌های سطح پایین وابسته باشند،
+      بلکه هر دو باید به Abstraction وابسته باشند. در Laravel این اصل با
+      Interfaceها و Service Container پیاده‌سازی می‌شود. مثلاً
+      <code>OrderService</code> به جای وابستگی مستقیم به
+      <code>EmailService</code>، به <code>NotificationService</code> Interface
+      وابسته می‌شود و Container پیاده‌سازی مناسب را Inject می‌کند. این کار
+      Coupling را کاهش می‌دهد، تست‌پذیری را افزایش می‌دهد و امکان جایگزینی
+      پیاده‌سازی‌ها را بدون تغییر کلاس‌های مصرف‌کننده فراهم می‌کند.
+    </p>
+  </body>
+</html>
