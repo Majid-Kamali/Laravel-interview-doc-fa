@@ -4,43 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>فهرست مستندات مصاحبه</title>
+    <link rel="stylesheet" href="style/font-style.css" />
     <link rel="stylesheet" href="style/styles.css" />
     <link rel="stylesheet" href="style/index-page.css" />
-    <link rel="stylesheet" href="style/font-style.css" />
   </head>
   <body>
     <h1>📚 مستندات آماده‌سازی مصاحبه</h1>
     <p style="text-align: center; color: var(--muted)">
-      دو فایل راهنمای جامع برای مرور مفاهیم کلیدی PHP، OOP، SOLID و داخلی‌های
-      لاراول
+      راهنماهای جامع برای مرور مفاهیم کلیدی PHP، OOP، SOLID و لاراول
     </p>
 
-    <div class="card-grid">
-      <!-- کارت اول: PHP OOP & SOLID -->
-      <a href="php-oop-solid-guide-p1.html" class="card">
-        <h2>📘 راهنمای PHP OOP و SOLID</h2>
-        <p>
-          مفاهیم پایهٔ شی‌گرایی، اینترفیس، ترایت، namespace، exception، اصول
-          SOLID با مثال‌های عملی و پاسخ‌های مصاحبه‌ای.
-        </p>
-        <span class="badge">PHP · OOP · SOLID</span>
-      </a>
-
-      <!-- کارت دوم: Laravel Internals -->
-      <a href="Laravel_Internals- p2.html" class="card">
-        <h2>⚙️ مستندات داخلی لاراول</h2>
-        <p>
-          چرخهٔ حیات درخواست، Service Container، Dependency Injection، Service
-          Providers، Facades، Middleware، Validation، امنیت، Policies و الگوهای
-          Repository/Service.
-        </p>
-        <span class="badge">Laravel · Container · Patterns</span>
-      </a>
-    </div>
+    <!-- Container کارت‌ها -->
+    <div class="card-grid" id="cardGrid"></div>
 
     <div class="footer-note">
-      ✨ این فایل برای مطالعه و مصاحبه برنامه نویس لاراول اماده شده است
+      ✨ این فایل برای مطالعه و مصاحبه‌ی برنامه‌نویسی لاراول آماده شده است.
       <br />
+      <span style="font-size: 0.85rem; color: var(--muted)">
+        کارت‌ها به‌صورت داینامیک توسط جاوااسکریپت بارگذاری می‌شوند.
+      </span>
     </div>
+
+    <script src="script/index-script.js"></script>
   </body>
 </html>

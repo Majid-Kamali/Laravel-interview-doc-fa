@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>راهنمای جامع روابط لاراول (Laravel Relations)</title>
+    <link rel="stylesheet" href="./style/font-style.css" />
+    <link rel="stylesheet" href="./style/styles.css" />
+    <link rel="stylesheet" href="./style/relations-guide-style.css" />
+  </head>
+  <body>
+    <a href="index.html" class="back-button">بازگشت به فهرست</a>
+
+    <h1>📘 راهنمای جامع روابط لاراول (Laravel Relations)</h1>
+    <p style="text-align: center; color: var(--muted)">
+      مرجع کامل و پروژه‌محور برای انواع روابط درEloquent – به همراه مثال‌های
+      عملی، نکات دیتابیس و سؤالات مصاحبه
+    </p>
+
+    <div class="toc">
+      <strong>فهرست مطالب</strong>
+      <ul>
+        <li><a href="#intro">مقدمه – روابط درEloquent</a></li>
+        <li><a href="#hasone">hasOne &amp; belongsTo (یک به یک)</a></li>
+        <li><a href="#hasmany">hasMany &amp; belongsTo (یک به چند)</a></li>
+        <li><a href="#belongstomany">belongsToMany (چند به چند) و Pivot</a></li>
+        <li><a href="#hasmanythrough">hasManyThrough (رابطه غیرمستقیم)</a></li>
+        <li>
+          <a href="#polymorphic">روابط Polymorphic</a>
+          <ul>
+            <li><a href="#morphone">morphOne – یک به یک چندریختی</a></li>
+            <li><a href="#morphmany">morphMany – یک به چند چندریختی</a></li>
+            <li>
+              <a href="#morphtomany">morphToMany – چند به چند چندریختی</a>
+            </li>
+          </ul>
+        </li>
+        <li><a href="#performance">نکات عملکردی و بهینه‌سازی</a></li>
+        <li><a href="#faq">سؤالات متداول مصاحبه</a></li>
+      </ul>
+    </div>
+
+    <hr />
+
+    <!-- ==================================================================== -->
+    <h1 id="intro">مقدمه – روابط درEloquent</h1>
+    <p>
+      در Laravel، <strong>Eloquent ORM</strong> روابط بین مدل‌ها را به صورت
+      شی‌گرا مدیریت می‌کند. هر رابطه به عنوان یک متد در مدل تعریف می‌شود و امکان
+      دسترسی آسان به داده‌های مرتبط را فراهم می‌آورد.
+    </p>
+    <div class="highlight-box">
+      <strong>نکته کلیدی:</strong> متد رابطه همیشه در مدلی تعریف می‌شود که
+      می‌خواهی از آن به مدل دیگر دسترسی پیدا کنی. مثلاً اگر بخواهی از
+      <code>User</code> به <code>Post</code> برسی، رابطه در
+      <code>User</code> تعریف می‌شود.
+    </div>
+
+    <hr />
+
+    <!-- ==================================================================== -->
+    <h1 id="hasone">hasOne &amp; belongsTo – رابطه یک به یک</h1>
+    <p><strong>سناریو:</strong> هر کاربر یک پروفایل دارد.</p>
+
+    <h2>ساختار جدول‌ها</h2>
+    <div class="table-grid">
+      <div>
+        <h4>جدول <code>users</code></h4>
+        <pre><code>id
+name
+email</code></pre>
+      </div>
+      <div>
+        <h4>جدول <code>profiles</code></h4>
+        <pre><code>id
+user_id (foreign key)
+avatar
+bio</code></pre>
+      </div>
+    </div>
+    <p>
+      <strong>Foreign Key</strong> در جدول <code>profiles</code> قرار می‌گیرد.
+    </p>
+
+    <h3>Migration</h3>
+    <pre><code>Schema::create('profiles', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('user_id')
+        ->constrained()
+        ->cascadeOnDelete();
+    $table->string('avatar')->nullable();
+    $table->text('bio')->nullable();
+    $table->timestamps();
+});</code></pre>
+
+    <h3>مدل‌ها</h3>
+    <div class="table-grid">
+      <div>
+        <h4><code>User</code></h4>
+        <pre><code>class User extends Model
+{
+    public function profile()
+    {
+        return $this->hasOne(Profile::class);
+    }
+}</code></pre>
+      </div>
+      <div>
+        <h4><code>Profile</code></h4>
+        <pre><code>class Profile extends Model
+{
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <h3>استفاده عملی</h3>
+    <pre><code>$user = User::find(1);
+$profile = $user->profile; // دریافت پروفایل
+
+// ایجاد پروفایل جدید
+$user->profile()->create([
+    'bio' => 'Laravel Developer',
+    'avatar' => 'avatar.jpg',
+]);</code></pre>
+
+    <div class="interview-answer">
+      <strong>سؤال مصاحبه:</strong> چرا <code>hasOne</code> در
+      <code>User</code> و <code>belongsTo</code> در <code>Profile</code>؟
+      <br />
+      چون <code>Profile</code> جدول وابسته است و Foreign Key را نگه می‌دارد.
+    </div>
+
+    <hr />
+
+    <!-- ==================================================================== -->
+    <h1 id="hasmany">hasMany &amp; belongsTo – رابطه یک به چند</h1>
+    <p><strong>سناریو:</strong> هر کاربر چند پست دارد.</p>
+
+    <h2>ساختار جدول‌ها</h2>
+    <div class="table-grid">
+      <div>
+        <h4>جدول <code>users</code></h4>
+        <pre><code>id
+name</code></pre>
+      </div>
+      <div>
+        <h4>جدول <code>posts</code></h4>
+        <pre><code>id
+user_id (foreign key)
+title
+content</code></pre>
+      </div>
+    </div>
+
+    <h3>مدل‌ها</h3>
+    <div class="table-grid">
+      <div>
+        <h4><code>User</code></h4>
+        <pre><code>public function posts()
+{
+    return $this->hasMany(Post::class);
+}</code></pre>
+      </div>
+      <div>
+        <h4><code>Post</code></h4>
+        <pre><code>public function user()
+{
+    return $this->belongsTo(User::class);
+}</code></pre>
+      </div>
+    </div>
+
+    <h3>استفاده عملی</h3>
+    <pre><code>$user = User::find(1);
+$user->posts; // Collection از تمام پست‌ها
+
+// ایجاد پست جدید
+$user->posts()->create([
+    'title' => 'Laravel Relations',
+    'content' => '...',
+]);
+
+// فیلتر کردن با Query Builder
+$publishedPosts = $user->posts()->where('status', 'published')->get();</code></pre>
+
+    <div class="box good">
+      <h3>✅ تفاوت <code>$user->posts</code> و <code>$user->posts()</code></h3>
+      <p>
+        <code>$user->posts</code> یک <strong>Collection</strong> برمی‌گرداند
+        (داده‌های بارگذاری‌شده).
+        <br />
+        <code>$user->posts()</code> یک
+        <strong>Relation Builder</strong> برمی‌گرداند که می‌توان روی آن کوئری
+        نوشت.
+      </p>
+    </div>
+
+    <hr />
+
+    <!-- ==================================================================== -->
+    <h1 id="belongstomany">belongsToMany – رابطه چند به چند</h1>
+    <p>
+      <strong>سناریو:</strong> هر کاربر در چند وب‌سایت عضو است و هر وب‌سایت چند
+      کاربر دارد.
+    </p>
+
+    <h2>ساختار جدول‌ها</h2>
+    <div class="table-grid">
+      <div>
+        <h4>جدول <code>users</code></h4>
+        <pre><code>id
+name</code></pre>
+      </div>
+      <div>
+        <h4>جدول <code>websites</code></h4>
+        <pre><code>id
+title</code></pre>
+      </div>
+      <div style="grid-column: 1 / -1">
+        <h4>جدول Pivot <code>user_website</code></h4>
+        <pre><code>user_id (foreign key)
+website_id (foreign key)
+role (ستون اضافی)
+joined_at (ستون اضافی)
+primary key: (user_id, website_id)</code></pre>
+      </div>
+    </div>
+
+    <h3>Migration Pivot</h3>
+    <pre><code>Schema::create('user_website', function (Blueprint $table) {
+    $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+    $table->foreignId('website_id')->constrained()->cascadeOnDelete();
+    $table->string('role');
+    $table->timestamp('joined_at');
+    $table->primary(['user_id', 'website_id']);
+});</code></pre>
+
+    <h3>مدل‌ها</h3>
+    <div class="table-grid">
+      <div>
+        <h4><code>User</code></h4>
+        <pre><code>public function websites()
+{
+    return $this->belongsToMany(Website::class)
+        ->withPivot('role', 'joined_at')
+        ->withTimestamps();
+}</code></pre>
+      </div>
+      <div>
+        <h4><code>Website</code></h4>
+        <pre><code>public function users()
+{
+    return $this->belongsToMany(User::class)
+        ->withPivot('role', 'joined_at');
+}</code></pre>
+      </div>
+    </div>
+
+    <h3>استفاده عملی</h3>
+    <pre><code>$user = User::find(1);
+$user->websites; // Collection از وب‌سایت‌ها
+
+// دسترسی به Pivot
+foreach ($user->websites as $website) {
+    echo $website->pivot->role;
+    echo $website->pivot->joined_at;
+}</code></pre>
+
+    <h3>متدهای مهم Pivot</h3>
+    <ul>
+      <li><code>attach($id, $attributes)</code> – اضافه کردن رابطه</li>
+      <li><code>detach($id)</code> – حذف رابطه</li>
+      <li><code>sync([$ids])</code> – همگام‌سازی (حذف و اضافه)</li>
+      <li><code>syncWithoutDetaching([$ids])</code> – فقط اضافه</li>
+      <li>
+        <code>updateExistingPivot($id, $attributes)</code> – به‌روزرسانی
+        ستون‌های Pivot
+      </li>
+    </ul>
+
+    <div class="interview-answer">
+      <strong>سؤال مصاحبه:</strong> اگر نام جدول Pivot
+      <code>website_members</code> باشد، چه چیزی باید در
+      <code>belongsToMany</code> تغییر کند؟
+      <br />
+      <pre><code>return $this->belongsToMany(Website::class, 'website_members');</code></pre>
+      آرگومان دوم نام جدول Pivot است.
+    </div>
+
+    <hr />
+
+    <!-- ==================================================================== -->
+    <h1 id="hasmanythrough">hasManyThrough – رابطه غیرمستقیم</h1>
+    <p>
+      <strong>سناریو:</strong> هر کشور چند کاربر دارد و هر کاربر چند پست.
+      می‌خواهیم از <code>Country</code> به <code>Post</code> برسیم.
+    </p>
+
+    <h2>ساختار جدول‌ها</h2>
+    <div class="table-grid">
+      <div>
+        <h4><code>countries</code></h4>
+        <pre><code>id
+name</code></pre>
+      </div>
+      <div>
+        <h4><code>users</code></h4>
+        <pre><code>id
+country_id</code></pre>
+      </div>
+      <div>
+        <h4><code>posts</code></h4>
+        <pre><code>id
+user_id</code></pre>
+      </div>
+    </div>
+
+    <h3>مدل Country</h3>
+    <pre><code>class Country extends Model
+{
+    public function posts()
+    {
+        return $this->hasManyThrough(
+            Post::class,
+            User::class
+        );
+    }
+}</code></pre>
+
+    <h3>استفاده عملی</h3>
+    <pre><code>$country = Country::find(1);
+$country->posts; // تمام پست‌های کاربران آن کشور</code></pre>
+    <p>Laravel کوئری زیر را اجرا می‌کند:</p>
+    <pre><code>SELECT posts.*
+FROM posts
+JOIN users ON users.id = posts.user_id
+WHERE users.country_id = 1;</code></pre>
+
+    <div class="box good">
+      <h3>✅ چه زمانی از <code>hasManyThrough</code> استفاده می‌کنیم؟</h3>
+      <p>
+        وقتی می‌خواهیم از طریق یک مدل واسط به مدل نهایی برسیم و نیازی به مدیریت
+        Pivot نداریم. مثال‌های واقعی: Company → Tasks، Organization → Tickets.
+      </p>
+    </div>
+
+    <div class="interview-answer">
+      <strong
+        >تفاوت <code>belongsToMany</code> و
+        <code>hasManyThrough</code> چیست؟</strong
+      >
+      <br />
+      <code>belongsToMany</code> برای رابطه چند به چند با جدول Pivot است.
+      <br />
+      <code>hasManyThrough</code> برای رابطه یک به چند غیرمستقیم (از طریق یک مدل
+      واسط) استفاده می‌شود.
+    </div>
+
+    <hr />
+
+    <!-- ==================================================================== -->
+    <h1 id="polymorphic">روابط Polymorphic (چندریختی)</h1>
+    <p>
+      <strong>ایده اصلی:</strong> یک جدول بتواند با چند مدل مختلف رابطه داشته
+      باشد.
+      <br />
+      مثال: <code>Comment</code> می‌تواند متعلق به <code>Post</code>،
+      <code>Product</code> یا <code>Video</code> باشد.
+    </p>
+
+    <!-- ====== morphOne ====== -->
+    <h2 id="morphone">morphOne – یک به یک چندریختی</h2>
+    <p>
+      <strong>سناریو:</strong> هم <code>User</code> و هم <code>Post</code> یک
+      تصویر اصلی دارند.
+    </p>
+
+    <h3>ساختار جدول <code>images</code></h3>
+    <pre><code>id
+url
+imageable_id
+imageable_type  // مقدار: 'App\Models\User' یا 'App\Models\Post'
+timestamps</code></pre>
+
+    <h3>Migration</h3>
+    <pre><code>Schema::create('images', function (Blueprint $table) {
+    $table->id();
+    $table->string('url');
+    $table->morphs('imageable'); // imageable_id + imageable_type
+    $table->timestamps();
+});</code></pre>
+
+    <h3>مدل‌ها</h3>
+    <div class="table-grid">
+      <div>
+        <h4><code>User</code></h4>
+        <pre><code>public function image()
+{
+    return $this->morphOne(Image::class, 'imageable');
+}</code></pre>
+      </div>
+      <div>
+        <h4><code>Post</code></h4>
+        <pre><code>public function image()
+{
+    return $this->morphOne(Image::class, 'imageable');
+}</code></pre>
+      </div>
+      <div style="grid-column: 1 / -1">
+        <h4><code>Image</code></h4>
+        <pre><code>public function imageable()
+{
+    return $this->morphTo();
+}</code></pre>
+      </div>
+    </div>
+
+    <h3>استفاده عملی</h3>
+    <pre><code>$user = User::find(1);
+echo $user->image->url;
+
+$post = Post::find(10);
+echo $post->image->url;
+
+// ایجاد تصویر برای کاربر
+$user->image()->create(['url' => '/avatars/user1.jpg']);</code></pre>
+
+    <div class="interview-answer">
+      <strong>تفاوت <code>morphOne</code> و <code>hasOne</code> چیست؟</strong>
+      <br />
+      <code>hasOne</code> فقط با یک مدل مشخص کار می‌کند (مثلاً User → Profile).
+      <br />
+      <code>morphOne</code> با چند مدل مختلف می‌تواند ارتباط داشته باشد (مثلاً
+      User → Image و Post → Image).
+    </div>
+
+    <!-- ====== morphMany ====== -->
+    <h2 id="morphmany">morphMany – یک به چند چندریختی</h2>
+    <p>
+      <strong>سناریو:</strong> <code>Post</code>، <code>Product</code> و
+      <code>User</code> همه می‌توانند <code>Comment</code> داشته باشند.
+    </p>
+
+    <h3>ساختار جدول <code>comments</code></h3>
+    <pre><code>id
+body
+commentable_id
+commentable_type  // 'App\Models\Post' یا 'App\Models\Product'
+timestamps</code></pre>
+
+    <h3>مدل‌ها</h3>
+    <div class="table-grid">
+      <div>
+        <h4><code>Post</code></h4>
+        <pre><code>public function comments()
+{
+    return $this->morphMany(Comment::class, 'commentable');
+}</code></pre>
+      </div>
+      <div>
+        <h4><code>Product</code></h4>
+        <pre><code>public function comments()
+{
+    return $this->morphMany(Comment::class, 'commentable');
+}</code></pre>
+      </div>
+      <div style="grid-column: 1 / -1">
+        <h4><code>Comment</code></h4>
+        <pre><code>public function commentable()
+{
+    return $this->morphTo();
+}</code></pre>
+      </div>
+    </div>
+
+    <h3>استفاده عملی</h3>
+    <pre><code>$post = Post::find(1);
+$post->comments; // Collection از کامنت‌ها
+
+$comment = Comment::find(5);
+$comment->commentable; // مدل والد (Post یا Product)
+
+// ایجاد کامنت برای پست
+$post->comments()->create(['body' => 'Laravel is great!']);</code></pre>
+
+    <div class="interview-answer">
+      <strong>تفاوت <code>morphMany</code> و <code>morphTo</code> چیست؟</strong>
+      <br />
+      <code>morphMany</code> در مدل مالک (مثلاً Post) تعریف می‌شود و نشان می‌دهد
+      که چند مدل وابسته دارد.
+      <br />
+      <code>morphTo</code> در مدل وابسته (مثلاً Comment) تعریف می‌شود و مشخص
+      می‌کند که به کدام مدل تعلق دارد.
+    </div>
+
+    <!-- ====== morphToMany ====== -->
+    <h2 id="morphtomany">morphToMany – چند به چند چندریختی</h2>
+    <p>
+      <strong>سناریو:</strong> <code>Post</code>، <code>Video</code> و
+      <code>Product</code> همگی می‌توانند <code>Tag</code> داشته باشند.
+    </p>
+
+    <h3>ساختار جدول‌ها</h3>
+    <div class="table-grid">
+      <div>
+        <h4><code>tags</code></h4>
+        <pre><code>id
+name</code></pre>
+      </div>
+      <div style="grid-column: 1 / -1">
+        <h4>جدول Pivot <code>taggables</code></h4>
+        <pre><code>tag_id
+taggable_id
+taggable_type  // 'App\Models\Post' یا 'App\Models\Video'</code></pre>
+      </div>
+    </div>
+
+    <h3>مدل‌ها</h3>
+    <div class="table-grid">
+      <div>
+        <h4><code>Post</code></h4>
+        <pre><code>public function tags()
+{
+    return $this->morphToMany(Tag::class, 'taggable');
+}</code></pre>
+      </div>
+      <div>
+        <h4><code>Video</code></h4>
+        <pre><code>public function tags()
+{
+    return $this->morphToMany(Tag::class, 'taggable');
+}</code></pre>
+      </div>
+      <div style="grid-column: 1 / -1">
+        <h4><code>Tag</code></h4>
+        <pre><code>public function posts()
+{
+    return $this->morphedByMany(Post::class, 'taggable');
+}
+
+public function videos()
+{
+    return $this->morphedByMany(Video::class, 'taggable');
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="interview-answer">
+      <strong
+        >تفاوت <code>belongsToMany</code> و
+        <code>morphToMany</code> چیست؟</strong
+      >
+      <br />
+      <code>belongsToMany</code> بین دو مدل مشخص (User ↔ Role) استفاده می‌شود.
+      <br />
+      <code>morphToMany</code> برای ارتباط یک مدل با چند مدل دیگر (Tag با Post,
+      Video, Product) استفاده می‌شود.
+    </div>
+
+    <hr />
+
+    <!-- ==================================================================== -->
+    <h1 id="performance">نکات عملکردی و بهینه‌سازی</h1>
+
+    <h2>تفاوت <code>with()</code> و <code>load()</code></h2>
+    <div class="table-grid">
+      <div>
+        <h4><code>with()</code> – Eager Loading قبل از کوئری</h4>
+        <pre><code>$users = User::with('posts')->get();
+// ۲ کوئری: users + posts</code></pre>
+      </div>
+      <div>
+        <h4><code>load()</code> – Lazy Eager Loading بعد از کوئری</h4>
+        <pre><code>$users = User::all();
+$users->load('posts');
+// ۲ کوئری: users + posts (اما جدا)</code></pre>
+      </div>
+    </div>
+    <div class="highlight-box">
+      <strong>نکته:</strong> از <code>with()</code> زمانی استفاده می‌کنیم که از
+      قبل می‌دانیم به رابطه نیاز داریم. از <code>load()</code> زمانی که بعداً
+      تصمیم می‌گیریم رابطه را بارگذاری کنیم.
+    </div>
+
+    <h2>شمارش و جمع‌آوری</h2>
+    <pre><code>// شمارش پست‌های هر کاربر
+$users = User::withCount('posts')->get();
+echo $users[0]->posts_count;
+
+// جمع بازدیدها
+$posts = Post::withSum('views', 'count')->get();
+echo $posts[0]->views_sum_count;</code></pre>
+
+    <h2>بارگذاری شرطی</h2>
+    <pre><code>$users = User::with(['posts' => function ($query) {
+    $query->where('status', 'published');
+}])->get();</code></pre>
+
+    <hr />
+
+    <!-- ==================================================================== -->
+    <h1 id="faq">سؤالات متداول مصاحبه</h1>
+
+    <div class="interview-answer">
+      <strong>۱. Foreign Key در هر رابطه کجاست؟</strong>
+      <ul>
+        <li><code>hasOne</code> / <code>hasMany</code> → جدول فرزند</li>
+        <li><code>belongsTo</code> → جدول فعلی (همین مدل)</li>
+        <li><code>belongsToMany</code> → جدول Pivot</li>
+        <li><code>hasManyThrough</code> → جدول واسط و جدول نهایی</li>
+      </ul>
+    </div>
+
+    <div class="interview-answer">
+      <strong>۲. تفاوت <code>with()</code> و <code>load()</code> چیست؟</strong>
+      <br />
+      <code>with()</code> برای Eager Loading قبل از اجرای کوئری استفاده می‌شود.
+      <br />
+      <code>load()</code> بعد از دریافت مدل یا Collection استفاده می‌شود (Lazy
+      Eager Loading).
+    </div>
+
+    <div class="interview-answer">
+      <strong>۳. چه زمانی از Polymorphic Relations استفاده می‌کنیم؟</strong>
+      <br />
+      وقتی یک مدل (مثلاً Comment) باید بتواند به چند مدل مختلف (Post, Product,
+      Video) متصل شود.
+    </div>
+
+    <div class="interview-answer">
+      <strong
+        >۴. فرق <code>morphMany</code> و <code>morphTo</code> چیست؟</strong
+      >
+      <br />
+      <code>morphMany</code> در مدل مالک (Post) تعریف می‌شود.
+      <br />
+      <code>morphTo</code> در مدل وابسته (Comment) تعریف می‌شود.
+    </div>
+
+    <div class="interview-answer">
+      <strong>۵. اگر جدول Pivot نام متفاوتی داشته باشد، چه می‌کنیم؟</strong>
+      <br />
+      آرگومان دوم <code>belongsToMany</code> را تغییر می‌دهیم:
+      <pre><code>return $this->belongsToMany(Website::class, 'website_members');</code></pre>
+    </div>
+
+    <hr />
+    <p style="text-align: center; color: var(--muted)">
+      پایان راهنمای جامع روابط لاراول – نسخه‌ی پروژه‌محور برای مصاحبه
+    </p>
+  </body>
+</html>

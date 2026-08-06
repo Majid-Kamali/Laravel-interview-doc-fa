@@ -286,3 +286,36 @@ blockquote {
 .flow .arrow {
   color: var(--accent);
 }
+
+
+/* ============================================
+   دکمه بازگشت به صفحه اصلی
+   ============================================ */
+.back-button {
+  display: inline-block;
+  background: var(--panel);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  margin-bottom: 20px;
+}
+
+.back-button:hover {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  transform: translateX(-4px);
+  /* حرکت به چپ (در RTL) */
+}
+
+.back-button::before {
+  content: "→ ";
+  /* فلش برای RTL */
+  font-weight: bold;
+}
+
+/* در حالت LTR یا برای دکمه‌های خاص می‌توان فلش را برعکس کرد */
